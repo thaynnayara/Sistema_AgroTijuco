@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agrotijuco_api
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/${POSTGRES_DB:-agrotijuco_prod}
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER:-agrotijuco_admin}
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-agrotijuco_secret_password}
+      - JWT_SECRET=${JWT_SECRET:-AgroTijucoSuperSecretKeyForJWTTokenGeneration2026SaaSPlatformRequiredAtLeast256BitsLong}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - agrotijuco_net
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2048M
+
+  db:
+    image: postgres:16-alpine
+    container_name: agrotijuco_db
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-agrotijuco_prod}
+      POSTGRES_USER: ${POSTGRES_USER:-agrotijuco_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-agrotijuco_secret_password}
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./src/main/resources/db/migration/V1__init_schema_and_rls.sql:/docker-entrypoint-initdb.d/V1__init_schema_and_rls.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-agrotijuco_admin} -d ${POSTGRES_DB:-agrotijuco_prod}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - agrotijuco_net
+
+volumes:
+  postgres_data:
+
+networks:
+  agrotijuco_net:
+    driver: bridge

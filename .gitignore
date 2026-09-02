@@ -1,0 +1,25 @@
+# Environment & Secrets
+.env
+.env*.local
+
+# Node & Frontend
+node_modules/
+dist/
+dist-ssr/
+
+# Java & Backend
+**/target/
+**/.mvn/wrapper/maven-wrapper.jar
+
+# IDE & Editor files
+.idea/
+*.iml
+.vscode/
+*.swp
+*.DS_Store
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
