@@ -5,13 +5,24 @@ import { TOKEN_KEY, USER_KEY } from '../services/api';
 
 const TECH_VIEW_KEY = '@AgroTijuco:techView';
 
+export const MOCK_ADMIN: User = {
+  id: 'f5e95a07-bc6e-4cd0-aecd-96b92883e932',
+  nome: 'Thaynná Yara',
+  email: 'thaynna.yara@agrotijuco.com.br',
+  perfil: 'ADMIN',
+  role: 'ADMIN',
+  tenantId: 'Fazenda AgroTijuco',
+  ativo: true,
+};
+
 export const MOCK_GESTOR: User = {
   id: 'usr-thaynna-yara-gestora',
   nome: 'Thaynná Yara',
-  email: 'thaynna.yara@agrotijuco.com.br',
+  email: 'thaynna.gestora@agrotijuco.com.br',
   perfil: 'GESTOR',
   role: 'GESTOR',
   tenantId: 'Fazenda AgroTijuco',
+  ativo: true,
 };
 
 export const MOCK_PRODUTOR: User = {
@@ -23,12 +34,14 @@ export const MOCK_PRODUTOR: User = {
   tenantId: 'Fazenda AgroTijuco',
   produtorId: '9b1deb4d-3b7d-4149-9cd6-890000000001',
   produtorNome: 'Walter Barreto',
+  ativo: true,
 };
 
 interface AuthContextData {
   signed: boolean;
   user: User | null;
   loading: boolean;
+  isAdmin: boolean;
   isGestor: boolean;
   isProdutor: boolean;
   showTechnicalDetails: boolean;
@@ -38,7 +51,7 @@ interface AuthContextData {
   register: (credentials: RegisterCredentials, rememberMe?: boolean) => Promise<void>;
   logout: () => void;
   setMockAuth: (user: User, token: string) => void;
-  switchUserRole: (role: 'GESTOR' | 'PRODUTOR') => void;
+  switchUserRole: (role: 'ADMIN' | 'GESTOR' | 'PRODUTOR') => void;
 }
 
 const AuthContext = createContext<AuthContextData>({} as AuthContextData);
@@ -117,13 +130,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(mockUser);
   };
 
-  const switchUserRole = (role: 'GESTOR' | 'PRODUTOR') => {
-    const targetUser = role === 'GESTOR' ? MOCK_GESTOR : MOCK_PRODUTOR;
+  const switchUserRole = (role: 'ADMIN' | 'GESTOR' | 'PRODUTOR') => {
+    let targetUser = MOCK_GESTOR;
+    if (role === 'ADMIN') targetUser = MOCK_ADMIN;
+    else if (role === 'PRODUTOR') targetUser = MOCK_PRODUTOR;
     setMockAuth(targetUser, 'mock-jwt-token-agrotijuco-2026');
   };
 
+  const isAdmin = user?.perfil === 'ADMIN' || user?.role === 'ADMIN';
   const isGestor = !user || user.perfil === 'GESTOR' || user.perfil === 'ADMIN' || user.role === 'GESTOR' || user.role === 'ADMIN';
-  const isProdutor = !isGestor;
+  const isProdutor = !isGestor && !isAdmin;
 
   return (
     <AuthContext.Provider
@@ -131,6 +147,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signed: !!user,
         user,
         loading,
+        isAdmin,
         isGestor,
         isProdutor,
         showTechnicalDetails,

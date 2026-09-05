@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { propriedadeService } from '../services/propriedadeService';
 import { produtorService } from '../services/produtorService';
 import { useAuth } from '../contexts/AuthContext';
+import { useFarm, FAZENDAS_PADRAO } from '../contexts/FarmContext';
 import type { Propriedade, Produtor } from '../types';
 import { 
   Home, 
@@ -15,8 +16,7 @@ import {
   MapPin, 
   Maximize2, 
   Building2, 
-  Copy,
-  Check
+  Copy
 } from 'lucide-react';
 
 const propriedadeSchema = z.object({
@@ -31,6 +31,7 @@ type PropriedadeFormData = z.infer<typeof propriedadeSchema>;
 
 export const Propriedades: React.FC = () => {
   const { showTechnicalDetails, isGestor, user } = useAuth();
+  const { selectedFarm, selectFarmById, propriedades: contextPropriedades } = useFarm();
   const [propriedades, setPropriedades] = useState<Propriedade[]>([]);
   const [produtores, setProdutores] = useState<Produtor[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -58,10 +59,13 @@ export const Propriedades: React.FC = () => {
         propriedadeService.listarTodas().catch(() => []),
         produtorService.listar().catch(() => []),
       ]);
-      setPropriedades(propsData || []);
+      const initialFarms = (propsData && propsData.length > 0)
+        ? propsData
+        : (contextPropriedades.length > 0 ? contextPropriedades : FAZENDAS_PADRAO);
+      setPropriedades(initialFarms);
       setProdutores(prodsData || []);
     } catch {
-      setPropriedades([]);
+      setPropriedades(contextPropriedades.length > 0 ? contextPropriedades : FAZENDAS_PADRAO);
       setProdutores([]);
     } finally {
       setLoading(false);
@@ -284,14 +288,24 @@ export const Propriedades: React.FC = () => {
               </div>
 
               <div className="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between text-xs">
-                <span className="text-emerald-800 font-semibold bg-emerald-50 px-2.5 py-0.5 rounded-full flex items-center">
-                  <Check className="w-3 h-3 mr-1 text-emerald-600" />
-                  {isGestor ? 'Fazenda Ativa' : 'Liberada para Manejo'}
-                </span>
+                {selectedFarm?.id === prop.id ? (
+                  <span className="text-white font-extrabold bg-agro-primary px-3 py-1 rounded-full flex items-center shadow-xs">
+                    ⭐ Fazenda Selecionada
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => prop.id && selectFarmById(prop.id)}
+                    className="text-xs font-bold text-agro-primary hover:bg-agro-secondary/40 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                    title="Selecionar esta fazenda para auditar e corrigir lançamentos"
+                  >
+                    🔍 Inspecionar Fazenda &rarr;
+                  </button>
+                )}
+
                 {isGestor ? (
                   <button
                     onClick={() => handleOpenReassign(prop)}
-                    className="text-agro-primary hover:underline font-semibold cursor-pointer"
+                    className="text-slate-600 hover:text-agro-primary hover:underline font-semibold cursor-pointer"
                   >
                     Atribuir Produtor &rarr;
                   </button>

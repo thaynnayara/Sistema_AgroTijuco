@@ -1,10 +1,12 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
+import { FarmProvider } from './contexts/FarmContext';
 import { PrivateRoute } from './components/PrivateRoute';
 import { DashboardLayout } from './layouts/DashboardLayout';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
+import { Usuarios } from './pages/Usuarios';
 import { Produtores } from './pages/Produtores';
 import { Propriedades } from './pages/Propriedades';
 import { Animais } from './pages/Animais';
@@ -19,33 +21,36 @@ import { Financeiro } from './pages/Financeiro';
 export const App: React.FC = () => {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          {/* Rota Pública */}
-          <Route path="/login" element={<Login />} />
+      <FarmProvider>
+        <BrowserRouter>
+          <Routes>
+            {/* Rota Pública */}
+            <Route path="/login" element={<Login />} />
 
-          {/* Rotas Privadas no Layout Principal */}
-          <Route element={<PrivateRoute />}>
-            <Route element={<DashboardLayout />}>
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/produtores" element={<Produtores />} />
-              <Route path="/propriedades" element={<Propriedades />} />
-              <Route path="/animais" element={<Animais />} />
-              <Route path="/pesagens" element={<Pesagens />} />
-              <Route path="/reproducao" element={<Reprodutivo />} />
-              <Route path="/sanidade" element={<Sanidade />} />
-              <Route path="/pastagens" element={<Pastagens />} />
-              <Route path="/nutricao" element={<Nutricao />} />
-              <Route path="/estoque" element={<Estoque />} />
-              <Route path="/financeiro" element={<Financeiro />} />
+            {/* Rotas Privadas no Layout Principal */}
+            <Route element={<PrivateRoute />}>
+              <Route element={<DashboardLayout />}>
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/usuarios" element={<Usuarios />} />
+                <Route path="/produtores" element={<Produtores />} />
+                <Route path="/propriedades" element={<Propriedades />} />
+                <Route path="/animais" element={<Animais />} />
+                <Route path="/pesagens" element={<Pesagens />} />
+                <Route path="/reproducao" element={<Reprodutivo />} />
+                <Route path="/sanidade" element={<Sanidade />} />
+                <Route path="/pastagens" element={<Pastagens />} />
+                <Route path="/nutricao" element={<Nutricao />} />
+                <Route path="/estoque" element={<Estoque />} />
+                <Route path="/financeiro" element={<Financeiro />} />
+              </Route>
             </Route>
-          </Route>
 
-          {/* Redirecionamento Padrão */}
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
-        </Routes>
-      </BrowserRouter>
+            {/* Redirecionamento Padrão */}
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </FarmProvider>
     </AuthProvider>
   );
 };

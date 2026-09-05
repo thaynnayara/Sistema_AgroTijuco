@@ -20,17 +20,22 @@ import {
   DollarSign,
   Wifi,
   WifiOff,
-  RefreshCw
+  RefreshCw,
+  Crown,
+  ShieldCheck
 } from 'lucide-react';
 import { offlineSyncService } from '../services/offlineSyncService';
+import { useFarm } from '../contexts/FarmContext';
 import api from '../services/api';
 
 export const DashboardLayout: React.FC = () => {
   const { 
     user, 
     logout, 
+    isAdmin,
     isGestor
   } = useAuth();
+  const { propriedades, selectedFarm, selectFarmById } = useFarm();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -79,7 +84,12 @@ export const DashboardLayout: React.FC = () => {
 
   const navItems = [
     { name: 'Visão Geral', path: '/dashboard', icon: LayoutDashboard },
-    ...(isGestor ? [{ name: 'Produtores Rurais', path: '/produtores', icon: Users }] : []),
+    ...(isAdmin || isGestor
+      ? [
+          { name: 'Produtores Rurais', path: '/produtores', icon: Users },
+          { name: 'Usuários Cadastrados', path: '/usuarios', icon: ShieldCheck },
+        ]
+      : []),
     { name: 'Fazendas & Propriedades', path: '/propriedades', icon: Home },
     { name: 'Rebanho & Animais', path: '/animais', icon: Beef },
     { name: 'Controle de Pesagens', path: '/pesagens', icon: Scale },
@@ -127,6 +137,28 @@ export const DashboardLayout: React.FC = () => {
             </div>
           </div>
 
+          {/* SELETOR GLOBAL DE FAZENDA (Visível para Admin, Gestor e Produtor) */}
+          <div className="hidden md:flex items-center space-x-2 bg-white/10 hover:bg-white/15 px-3 py-1.5 rounded-xl border border-white/20 transition-colors">
+            <Home className="w-4 h-4 text-agro-secondary shrink-0" />
+            <div className="flex flex-col text-left">
+              <span className="text-[10px] uppercase font-bold text-agro-secondary leading-none">
+                Fazenda Selecionada
+              </span>
+              <select
+                value={selectedFarm?.id || ''}
+                onChange={(e) => selectFarmById(e.target.value)}
+                className="bg-transparent text-white text-xs font-bold focus:outline-none cursor-pointer pr-1 truncate max-w-[210px]"
+                title="Selecione a fazenda para auditoria e gestão"
+              >
+                {propriedades.map((p) => (
+                  <option key={p.id} value={p.id} className="text-slate-900 font-medium">
+                    {p.nome || p.nomeFazenda} ({p.areaHectares} ha)
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
           {/* Offline Sync Status */}
           <div className="flex items-center space-x-2 sm:space-x-3">
             {/* Status Indicator */}
@@ -159,15 +191,18 @@ export const DashboardLayout: React.FC = () => {
             {/* User Profile & Logout */}
             <div className="flex items-center space-x-2.5 pl-2 sm:pl-3 border-l border-white/20">
               <div className="text-right hidden sm:block">
-                <div className="text-sm font-semibold text-white leading-tight">
-                  {displayName}
+                <div className="text-sm font-semibold text-white leading-tight flex items-center justify-end gap-1">
+                  {isAdmin && <Crown className="w-3.5 h-3.5 text-amber-300" />}
+                  <span>{displayName}</span>
                 </div>
                 <div className="text-xs text-agro-secondary/90">
-                  {isGestor ? 'Administrador / Gestor' : 'Produtor Rural'}
+                  {isAdmin ? 'Administrador Geral' : isGestor ? 'Gestor da Fazenda' : 'Produtor Rural'}
                 </div>
               </div>
 
-              <div className="w-9 h-9 rounded-xl bg-agro-secondary text-agro-forest font-bold flex items-center justify-center text-sm shadow-xs border border-white/30">
+              <div className={`w-9 h-9 rounded-xl font-bold flex items-center justify-center text-sm shadow-xs border border-white/30 ${
+                isAdmin ? 'bg-purple-600 text-white' : 'bg-agro-secondary text-agro-forest'
+              }`}>
                 {displayName.charAt(0).toUpperCase()}
               </div>
 
@@ -191,8 +226,14 @@ export const DashboardLayout: React.FC = () => {
           <div className="sticky top-22 bg-white rounded-2xl p-4 shadow-card border border-agro-border max-h-[calc(100vh-6rem)] overflow-y-auto">
             <div className="px-3 py-2 text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
               <span>Módulos do Sistema</span>
-              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${isGestor ? 'bg-agro-secondary text-agro-forest' : 'bg-amber-100 text-amber-800'}`}>
-                {isGestor ? 'GESTORA' : 'PRODUTOR'}
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                isAdmin
+                  ? 'bg-purple-100 text-purple-900'
+                  : isGestor
+                  ? 'bg-agro-secondary text-agro-forest'
+                  : 'bg-amber-100 text-amber-800'
+              }`}>
+                {isAdmin ? 'ADMIN' : isGestor ? 'GESTORA' : 'PRODUTOR'}
               </span>
             </div>
 

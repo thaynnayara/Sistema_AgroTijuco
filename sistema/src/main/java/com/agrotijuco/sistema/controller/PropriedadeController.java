@@ -53,4 +53,25 @@ public class PropriedadeController {
         Propriedade atualizada = service.atribuirProdutor(propriedadeId, produtorId);
         return ResponseEntity.ok(atualizada);
     }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<Propriedade> buscarPorId(@PathVariable UUID id) {
+        return ResponseEntity.ok(service.buscarPorId(id));
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GESTOR')")
+    public ResponseEntity<Propriedade> atualizar(
+            @PathVariable UUID id,
+            @RequestBody Propriedade dados) {
+        Propriedade atualizada = service.atualizar(id, dados);
+        return ResponseEntity.ok(atualizada);
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> deletar(@PathVariable UUID id) {
+        service.deletar(id);
+        return ResponseEntity.noContent().build();
+    }
 }

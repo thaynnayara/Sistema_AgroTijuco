@@ -54,4 +54,32 @@ public class PropriedadeService {
         propriedade.setProdutor(novoProdutor);
         return propriedadeRepository.save(propriedade);
     }
+
+    public Propriedade buscarPorId(UUID id) {
+        return propriedadeRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Propriedade não encontrada com ID: " + id));
+    }
+
+    @Transactional
+    public Propriedade atualizar(UUID id, Propriedade dadosAtualizados) {
+        Propriedade propriedade = buscarPorId(id);
+        if (dadosAtualizados.getNomeFazenda() != null && !dadosAtualizados.getNomeFazenda().isBlank()) {
+            propriedade.setNomeFazenda(dadosAtualizados.getNomeFazenda());
+        }
+        if (dadosAtualizados.getMunicipio() != null && !dadosAtualizados.getMunicipio().isBlank()) {
+            propriedade.setMunicipio(dadosAtualizados.getMunicipio());
+        }
+        if (dadosAtualizados.getAreaHectares() != null && dadosAtualizados.getAreaHectares() > 0) {
+            propriedade.setAreaHectares(dadosAtualizados.getAreaHectares());
+        }
+        return propriedadeRepository.save(propriedade);
+    }
+
+    @Transactional
+    public void deletar(UUID id) {
+        if (!propriedadeRepository.existsById(id)) {
+            throw new RuntimeException("Propriedade não encontrada com ID: " + id);
+        }
+        propriedadeRepository.deleteById(id);
+    }
 }

@@ -6,6 +6,8 @@ import com.agrotijuco.sistema.dto.auth.RegisterRequestDTO;
 import com.agrotijuco.sistema.dto.auth.TokenResponseDTO;
 import com.agrotijuco.sistema.model.Usuario;
 import com.agrotijuco.sistema.repository.UsuarioRepository;
+import com.agrotijuco.sistema.config.tenant.TenantContext;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,19 +27,30 @@ public class AuthService {
 
     @Transactional
     public TokenResponseDTO register(RegisterRequestDTO dto) {
-        if (usuarioRepository.existsByEmail(dto.getEmail())) {
+        String normalizedEmail = dto.getEmail() != null ? dto.getEmail().trim().toLowerCase() : "";
+        if (usuarioRepository.existsByEmailIgnoringTenant(normalizedEmail)) {
             throw new IllegalArgumentException("Email já cadastrado na plataforma.");
         }
 
+        String previousTenant = TenantContext.getCurrentTenant();
         Usuario usuario = new Usuario();
-        usuario.setNome(dto.getNome());
-        usuario.setEmail(dto.getEmail());
-        usuario.setSenha(passwordEncoder.encode(dto.getSenha()));
-        usuario.setTenantId(dto.getTenantId());
-        usuario.setRole(dto.getRole() != null ? dto.getRole() : com.agrotijuco.sistema.model.Role.GESTOR);
-        usuario.setAtivo(true);
+        try {
+            TenantContext.setCurrentTenant(dto.getTenantId());
+            usuario.setNome(dto.getNome());
+            usuario.setEmail(normalizedEmail);
+            usuario.setSenha(passwordEncoder.encode(dto.getSenha()));
+            usuario.setTenantId(dto.getTenantId());
+            usuario.setRole(dto.getRole() != null ? dto.getRole() : com.agrotijuco.sistema.model.Role.GESTOR);
+            usuario.setAtivo(true);
 
-        usuarioRepository.save(usuario);
+            usuarioRepository.save(usuario);
+        } finally {
+            if (previousTenant != null && !previousTenant.isBlank()) {
+                TenantContext.setCurrentTenant(previousTenant);
+            } else {
+                TenantContext.clear();
+            }
+        }
 
         String token = jwtTokenService.generateToken(
                 usuario.getEmail(),
@@ -59,15 +72,16 @@ public class AuthService {
     }
 
     public TokenResponseDTO login(LoginRequestDTO dto) {
-        Usuario usuario = usuarioRepository.findByEmail(dto.getEmail())
-                .orElseThrow(() -> new IllegalArgumentException("Credenciais inválidas."));
+        String normalizedEmail = dto.getEmail() != null ? dto.getEmail().trim().toLowerCase() : "";
+        Usuario usuario = usuarioRepository.findByEmailIgnoringTenant(normalizedEmail)
+                .orElseThrow(() -> new BadCredentialsException("Credenciais inválidas."));
 
         if (!passwordEncoder.matches(dto.getSenha(), usuario.getSenha())) {
-            throw new IllegalArgumentException("Credenciais inválidas.");
+            throw new BadCredentialsException("Credenciais inválidas.");
         }
 
         if (!usuario.isAtivo()) {
-            throw new IllegalStateException("Usuário inativo.");
+            throw new IllegalStateException("Usuário inativo. Entre em contato com o administrador.");
         }
 
         String token = jwtTokenService.generateToken(

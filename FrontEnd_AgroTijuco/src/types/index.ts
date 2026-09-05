@@ -10,6 +10,8 @@ export interface User {
   tenantId: string; // Multi-tenancy isolation key
   produtorId?: string; // UUID do produtor
   produtorNome?: string;
+  ativo?: boolean;
+  createdAt?: string;
 }
 
 export interface AuthResponse {

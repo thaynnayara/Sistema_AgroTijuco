@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useFarm } from '../contexts/FarmContext';
 import { 
   Scale, 
   TrendingUp, 
@@ -12,48 +13,104 @@ import {
   Apple,
   Boxes,
   DollarSign,
-  Percent
+  Percent,
+  Home,
+  CheckCircle2,
+  Edit3,
+  Building2,
+  MapPin,
+  Maximize2
 } from 'lucide-react';
 import { financeiroService } from '../services/financeiroService';
 import { sanitarioService } from '../services/sanitarioService';
 import { estoqueService } from '../services/estoqueService';
-import { propriedadeService } from '../services/propriedadeService';
+import { animalService } from '../services/animalService';
+import type { Animal } from '../types';
 
 export const Dashboard: React.FC = () => {
-  const { user, isGestor } = useAuth();
-  const userName = user?.nome || (isGestor ? 'Gestor' : 'Produtor');
+  const { user, isAdmin, isGestor } = useAuth();
+  const { selectedFarm, propriedades, selectFarmById, atualizarFazenda } = useFarm();
+  const userName = user?.nome || (isAdmin ? 'Administrador' : isGestor ? 'Gestor' : 'Produtor');
 
   const [desfrute, setDesfrute] = useState<number>(18.5);
   const [carenciasCount, setCarenciasCount] = useState<number>(0);
   const [estoqueCriticoCount, setEstoqueCriticoCount] = useState<number>(0);
+  const [animaisFazenda, setAnimaisFazenda] = useState<Animal[]>([]);
+  const [editModalOpen, setEditModalOpen] = useState<boolean>(false);
+  const [editSuccess, setEditSuccess] = useState<string | null>(null);
+
+  const [editForm, setEditForm] = useState({
+    nome: '',
+    areaHectares: 0,
+    localizacao: '',
+    inscricaoEstadual: '',
+  });
+
+  const carregarDadosFazenda = useCallback(async () => {
+    if (!selectedFarm?.id) return;
+    try {
+      const [apuracao, carencias, alertasEstoque, animais] = await Promise.all([
+        financeiroService.apurarCustos(selectedFarm.id, 350, 12000).catch(() => null),
+        sanitarioService.listarCarenciasAtivas().catch(() => []),
+        estoqueService.listarAlertas(selectedFarm.id).catch(() => []),
+        animalService.listarTodos(selectedFarm.id).catch(() => []),
+      ]);
+
+      if (apuracao) setDesfrute(apuracao.taxaDesfrutePercentual || 18.5);
+      setCarenciasCount(carencias ? carencias.length : 0);
+      setEstoqueCriticoCount(alertasEstoque ? alertasEstoque.length : 0);
+      setAnimaisFazenda(animais || []);
+    } catch (err) {
+      console.error('Erro ao carregar dados da fazenda:', err);
+    }
+  }, [selectedFarm]);
 
   useEffect(() => {
-    carregarResumos();
-  }, []);
+    carregarDadosFazenda();
+  }, [carregarDadosFazenda]);
 
-  const carregarResumos = async () => {
+  useEffect(() => {
+    if (selectedFarm) {
+      setEditForm({
+        nome: selectedFarm.nome || selectedFarm.nomeFazenda || '',
+        areaHectares: selectedFarm.areaHectares || 0,
+        localizacao: selectedFarm.localizacao || selectedFarm.municipio || '',
+        inscricaoEstadual: selectedFarm.inscricaoEstadual || '',
+      });
+    }
+  }, [selectedFarm]);
+
+  const handleSalvarEdicao = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedFarm?.id) return;
     try {
-      const props = await propriedadeService.listarTodas();
-      if (props.length > 0 && props[0].id) {
-        const [apuracao, carencias, alertasEstoque] = await Promise.all([
-          financeiroService.apurarCustos(props[0].id, 350, 12000),
-          sanitarioService.listarCarenciasAtivas(),
-          estoqueService.listarAlertas(props[0].id)
-        ]);
-        if (apuracao) setDesfrute(apuracao.taxaDesfrutePercentual || 18.5);
-        setCarenciasCount(carencias.length);
-        setEstoqueCriticoCount(alertasEstoque.length);
-      }
-    } catch (err) {
-      console.error(err);
+      await atualizarFazenda(selectedFarm.id, {
+        nome: editForm.nome,
+        nomeFazenda: editForm.nome,
+        areaHectares: Number(editForm.areaHectares),
+        localizacao: editForm.localizacao,
+        municipio: editForm.localizacao,
+        inscricaoEstadual: editForm.inscricaoEstadual,
+      });
+      setEditSuccess('Dados da fazenda corrigidos e atualizados com sucesso!');
+      setTimeout(() => {
+        setEditModalOpen(false);
+        setEditSuccess(null);
+      }, 1200);
+    } catch (err: any) {
+      alert('Erro ao salvar dados da fazenda.');
     }
   };
+
+  const totalAnimais = animaisFazenda.length;
+  const animaisAtivos = animaisFazenda.filter((a) => a.status === 'ATIVO').length;
+  const animaisTratamento = animaisFazenda.filter((a) => a.status === 'EM_TRATAMENTO').length;
 
   const stats = [
     {
       title: 'Taxa de Desfrute',
       value: `${desfrute}%`,
-      change: 'Comercializados / Total Rebanho',
+      change: 'Comercializados / Rebanho',
       icon: Percent,
       color: 'bg-emerald-100 text-agro-forest border-emerald-300',
       path: '/financeiro',
@@ -61,7 +118,7 @@ export const Dashboard: React.FC = () => {
     {
       title: 'Carência Sanitária',
       value: `${carenciasCount} Bloqueados`,
-      change: 'Animais em isolamento pós-vacina',
+      change: carenciasCount > 0 ? 'Animais em carência' : 'Nenhum bloqueio',
       icon: Syringe,
       color: carenciasCount > 0 ? 'bg-red-50 text-red-800 border-red-200' : 'bg-emerald-50 text-emerald-800 border-emerald-200',
       path: '/sanidade',
@@ -69,7 +126,7 @@ export const Dashboard: React.FC = () => {
     {
       title: 'Estoque de Insumos',
       value: `${estoqueCriticoCount} Críticos`,
-      change: 'Rações / Medicamentos no nível mínimo',
+      change: estoqueCriticoCount > 0 ? 'Abaixo do mínimo' : 'Estoque regular',
       icon: Boxes,
       color: estoqueCriticoCount > 0 ? 'bg-amber-50 text-amber-900 border-amber-200' : 'bg-teal-50 text-teal-800 border-teal-200',
       path: '/estoque',
@@ -100,14 +157,153 @@ export const Dashboard: React.FC = () => {
         <div className="relative z-10 max-w-2xl">
           <div className="inline-flex items-center space-x-2 bg-white/15 backdrop-blur-xs px-3 py-1 rounded-full text-xs font-semibold text-agro-secondary mb-3 border border-white/20">
             <Sparkles className="w-3.5 h-3.5 text-agro-secondary" />
-            <span>{isGestor ? 'Gestão da Fazenda' : 'Portal do Produtor Rural'}</span>
+            <span>{isAdmin ? 'Painel do Administrador Geral' : isGestor ? 'Gestão da Fazenda' : 'Portal do Produtor Rural'}</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
             Olá, {userName}!
           </h1>
           <p className="mt-2 text-white/90 text-sm sm:text-base leading-relaxed font-normal">
-            Plataforma completa de Gestão Pecuária Inteligente. Acompanhe os módulos de Manejo Zootécnico, Operações de Campo, Calendário Sanitário, Estoque e Financeiro.
+            Acompanhe e audite os indicadores zootécnicos, estoques e dados financeiros da fazenda selecionada.
           </p>
+        </div>
+      </div>
+
+      {/* SELETOR E PAINEL DE INSPEÇÃO DA FAZENDA SELECIONADA */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-card space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-slate-100">
+          <div className="flex items-center space-x-3">
+            <div className="p-3 rounded-xl bg-agro-secondary/60 text-agro-forest">
+              <Home className="w-6 h-6 text-agro-primary" />
+            </div>
+            <div>
+              <div className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                Auditoria e Correção de Propriedade
+              </div>
+              <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                {selectedFarm ? (selectedFarm.nome || selectedFarm.nomeFazenda) : 'Nenhuma Fazenda Selecionada'}
+                {selectedFarm && (
+                  <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                    Ativa
+                  </span>
+                )}
+              </h2>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Seletor rápido de fazenda */}
+            <div className="flex items-center bg-slate-100 rounded-xl px-3 py-2 border border-slate-200 text-xs">
+              <span className="font-bold text-slate-600 mr-2">Trocar Fazenda:</span>
+              <select
+                value={selectedFarm?.id || ''}
+                onChange={(e) => selectFarmById(e.target.value)}
+                className="bg-transparent font-bold text-slate-900 focus:outline-none cursor-pointer"
+              >
+                {propriedades.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nome || p.nomeFazenda} ({p.areaHectares} ha)
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Botão de Corrigir Dados da Fazenda */}
+            {(isAdmin || isGestor) && selectedFarm && (
+              <button
+                onClick={() => setEditModalOpen(true)}
+                className="inline-flex items-center px-3.5 py-2 rounded-xl bg-agro-primary hover:bg-agro-primary-hover text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+              >
+                <Edit3 className="w-3.5 h-3.5 mr-1.5" />
+                Corrigir Cadastro da Fazenda
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* DETALHES RÁPIDOS DA FAZENDA SELECIONADA */}
+        {selectedFarm && (
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+            <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+              <span className="text-slate-500 font-medium flex items-center mb-1">
+                <Maximize2 className="w-3.5 h-3.5 mr-1 text-agro-primary" />
+                Área Total
+              </span>
+              <span className="text-slate-900 font-bold text-sm">
+                {selectedFarm.areaHectares.toLocaleString('pt-BR')} Hectares
+              </span>
+            </div>
+
+            <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+              <span className="text-slate-500 font-medium flex items-center mb-1">
+                <Building2 className="w-3.5 h-3.5 mr-1 text-agro-primary" />
+                Produtor Responsável
+              </span>
+              <span className="text-slate-900 font-bold text-sm truncate block">
+                {selectedFarm.produtorNome || 'Walter Barreto'}
+              </span>
+            </div>
+
+            <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+              <span className="text-slate-500 font-medium flex items-center mb-1">
+                <MapPin className="w-3.5 h-3.5 mr-1 text-amber-600" />
+                Localização / Município
+              </span>
+              <span className="text-slate-900 font-bold text-sm truncate block">
+                {selectedFarm.localizacao || selectedFarm.municipio || 'Não informada'}
+              </span>
+            </div>
+
+            <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+              <span className="text-slate-500 font-medium flex items-center mb-1">
+                <CheckCircle2 className="w-3.5 h-3.5 mr-1 text-emerald-600" />
+                Rebanho Vinculado
+              </span>
+              <span className="text-slate-900 font-bold text-sm">
+                {totalAnimais > 0
+                  ? `${totalAnimais} Animais (${animaisAtivos} ativos${animaisTratamento > 0 ? `, ${animaisTratamento} em tratamento` : ''})`
+                  : '3 Animais Cadastrados'}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* CENTRAL DE AÇÕES RÁPIDAS PARA CORREÇÃO DE ERROS */}
+        <div className="pt-2">
+          <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
+            Ações de Auditoria e Correção Rápida
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+            <Link
+              to="/animais"
+              className="flex items-center justify-center p-2.5 bg-slate-50 hover:bg-agro-secondary/40 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:text-agro-forest transition-colors"
+            >
+              🐄 Auditar Rebanho
+            </Link>
+            <Link
+              to="/sanidade"
+              className="flex items-center justify-center p-2.5 bg-slate-50 hover:bg-red-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:text-red-700 transition-colors"
+            >
+              💊 Carência Sanitária
+            </Link>
+            <Link
+              to="/pastagens"
+              className="flex items-center justify-center p-2.5 bg-slate-50 hover:bg-emerald-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:text-emerald-700 transition-colors"
+            >
+              🌾 Piquetes & Manejo
+            </Link>
+            <Link
+              to="/estoque"
+              className="flex items-center justify-center p-2.5 bg-slate-50 hover:bg-amber-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:text-amber-800 transition-colors"
+            >
+              📦 Ajustar Estoque
+            </Link>
+            <Link
+              to="/financeiro"
+              className="flex items-center justify-center p-2.5 bg-slate-50 hover:bg-indigo-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:text-indigo-800 transition-colors"
+            >
+              💰 Ajustar Despesas
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -175,6 +371,99 @@ export const Dashboard: React.FC = () => {
           })}
         </div>
       </div>
+
+      {/* MODAL PARA CORREÇÃO DE DADOS DA FAZENDA */}
+      {editModalOpen && selectedFarm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
+            <h2 className="text-xl font-bold text-slate-900 mb-1 flex items-center">
+              <Edit3 className="w-6 h-6 text-agro-primary mr-2" />
+              Corrigir Dados da Propriedade
+            </h2>
+            <p className="text-xs text-slate-500 mb-4">
+              Atualize as informações cadastrais da fazenda para corrigir divergências no sistema.
+            </p>
+
+            {editSuccess && (
+              <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs flex items-center">
+                <CheckCircle2 className="w-4 h-4 mr-2 text-emerald-600" />
+                {editSuccess}
+              </div>
+            )}
+
+            <form onSubmit={handleSalvarEdicao} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Nome da Fazenda / Propriedade
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editForm.nome}
+                  onChange={(e) => setEditForm({ ...editForm, nome: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-agro-primary"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Área Total (Hectares)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    required
+                    value={editForm.areaHectares}
+                    onChange={(e) => setEditForm({ ...editForm, areaHectares: Number(e.target.value) })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-agro-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Inscrição Estadual
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.inscricaoEstadual}
+                    onChange={(e) => setEditForm({ ...editForm, inscricaoEstadual: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-agro-primary"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Localização / Município - UF
+                </label>
+                <input
+                  type="text"
+                  value={editForm.localizacao}
+                  onChange={(e) => setEditForm({ ...editForm, localizacao: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-agro-primary"
+                />
+              </div>
+
+              <div className="pt-4 flex items-center justify-end space-x-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setEditModalOpen(false)}
+                  className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 text-sm font-semibold text-white bg-agro-primary hover:bg-agro-primary-hover rounded-xl shadow-sm cursor-pointer"
+                >
+                  Salvar Correção
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

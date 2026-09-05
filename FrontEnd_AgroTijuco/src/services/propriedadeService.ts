@@ -20,5 +20,14 @@ export const propriedadeService = {
   async obterPorId(uuid: string): Promise<Propriedade> {
     const response = await api.get<Propriedade>(`/propriedades/${uuid}`);
     return response.data;
+  },
+
+  async atualizarPropriedade(uuid: string, dados: Partial<Propriedade>): Promise<Propriedade> {
+    const response = await api.put<Propriedade>(`/propriedades/${uuid}`, dados);
+    return response.data;
+  },
+
+  async deletarPropriedade(uuid: string): Promise<void> {
+    await api.delete(`/propriedades/${uuid}`);
   }
 };

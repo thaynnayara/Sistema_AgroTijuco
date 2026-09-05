@@ -39,6 +39,7 @@ export const Login: React.FC = () => {
   const {
     register: registerLoginField,
     handleSubmit: handleLoginSubmit,
+    setValue: setValueLogin,
     formState: { errors: loginErrors },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -48,6 +49,12 @@ export const Login: React.FC = () => {
       lembrarMe: true,
     },
   });
+
+  const preencherAdmin = () => {
+    setValueLogin('email', 'thaynna.yara@agrotijuco.com.br');
+    setValueLogin('senha', 'AdminAgro2026!');
+    setErrorMessage(null);
+  };
 
   // Form de Registro
   const {
@@ -73,14 +80,17 @@ export const Login: React.FC = () => {
     try {
       await login(
         {
-          email: data.email,
-          senha: data.senha,
+          email: (data.email || '').trim().toLowerCase(),
+          senha: (data.senha || '').trim(),
         },
         data.lembrarMe
       );
       navigate('/dashboard');
     } catch (err: any) {
-      const msg = err.response?.data?.message || err.message || 'Erro ao realizar login. Verifique seu e-mail e senha.';
+      const rawMsg = err.response?.data?.message || err.message || '';
+      const msg = rawMsg && !rawMsg.includes('URL') && !rawMsg.includes('Failed to construct') && !rawMsg.includes('status code')
+        ? rawMsg
+        : 'E-mail ou senha incorretos. Por favor, verifique suas credenciais de acesso.';
       setErrorMessage(msg);
     } finally {
       setIsSubmitting(false);
@@ -185,7 +195,29 @@ export const Login: React.FC = () => {
 
           {/* FORMULÁRIO DE LOGIN */}
           {activeTab === 'login' && (
-            <form className="space-y-4" onSubmit={handleLoginSubmit(onLoginSubmit)}>
+            <div>
+              {/* Botão de Preenchimento Rápido do Administrador */}
+              <div className="mb-4 p-3 bg-amber-50/90 border border-amber-200 rounded-xl flex items-center justify-between gap-3 text-xs">
+                <div>
+                  <span className="font-bold text-amber-950 flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-amber-600" />
+                    Conta Administrador do Sistema
+                  </span>
+                  <span className="text-amber-800 text-[11px] font-mono mt-0.5 block">
+                    thaynna.yara@agrotijuco.com.br
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={preencherAdmin}
+                  className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg shadow-xs transition-all cursor-pointer text-xs flex items-center gap-1 shrink-0"
+                >
+                  <UserCheck className="w-3.5 h-3.5" />
+                  Preencher
+                </button>
+              </div>
+
+              <form className="space-y-4" onSubmit={handleLoginSubmit(onLoginSubmit)}>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">
                   E-mail de Acesso
@@ -262,7 +294,8 @@ export const Login: React.FC = () => {
                 )}
               </button>
             </form>
-          )}
+          </div>
+        )}
 
           {/* FORMULÁRIO DE CRIAR CONTA */}
           {activeTab === 'register' && (
