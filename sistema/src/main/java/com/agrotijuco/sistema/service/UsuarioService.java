@@ -21,21 +21,21 @@ public class UsuarioService {
     }
 
     public List<UsuarioDTO> listarTodos() {
-        return usuarioRepository.findAll()
+        return usuarioRepository.findAllUsersGlobal()
                 .stream()
                 .map(UsuarioDTO::new)
                 .collect(Collectors.toList());
     }
 
     public UsuarioDTO buscarPorId(UUID id) {
-        Usuario usuario = usuarioRepository.findById(id)
+        Usuario usuario = usuarioRepository.findByIdIgnoringTenant(id)
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado com ID: " + id));
         return new UsuarioDTO(usuario);
     }
 
     @Transactional
     public UsuarioDTO atualizarStatus(UUID id, boolean ativo) {
-        Usuario usuario = usuarioRepository.findById(id)
+        Usuario usuario = usuarioRepository.findByIdIgnoringTenant(id)
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado com ID: " + id));
         usuario.setAtivo(ativo);
         return new UsuarioDTO(usuarioRepository.save(usuario));
@@ -43,7 +43,7 @@ public class UsuarioService {
 
     @Transactional
     public UsuarioDTO atualizarRole(UUID id, Role role) {
-        Usuario usuario = usuarioRepository.findById(id)
+        Usuario usuario = usuarioRepository.findByIdIgnoringTenant(id)
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado com ID: " + id));
         usuario.setRole(role);
         return new UsuarioDTO(usuarioRepository.save(usuario));
@@ -51,9 +51,8 @@ public class UsuarioService {
 
     @Transactional
     public void deletar(UUID id) {
-        if (!usuarioRepository.existsById(id)) {
-            throw new RuntimeException("Usuário não encontrado com ID: " + id);
-        }
-        usuarioRepository.deleteById(id);
+        Usuario usuario = usuarioRepository.findByIdIgnoringTenant(id)
+                .orElseThrow(() -> new RuntimeException("Usuário não encontrado com ID: " + id));
+        usuarioRepository.delete(usuario);
     }
 }

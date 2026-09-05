@@ -42,7 +42,7 @@ export const Usuarios: React.FC = () => {
     nome: '',
     email: '',
     senha: '',
-    role: 'GESTOR',
+    role: 'PRODUTOR',
     tenantId: 'Fazenda AgroTijuco',
   });
 
@@ -80,7 +80,7 @@ export const Usuarios: React.FC = () => {
         nome: '',
         email: '',
         senha: '',
-        role: 'GESTOR',
+        role: 'PRODUTOR',
         tenantId: propriedades[0]?.nome || 'Fazenda AgroTijuco',
       });
     } catch (err: any) {
@@ -100,6 +100,26 @@ export const Usuarios: React.FC = () => {
       setUsuarios((prev) =>
         prev.map((u) => (u.id === targetUser.id ? { ...u, ativo: novoStatus } : u))
       );
+    }
+  };
+
+  const handleMudarRoleDireto = async (targetUser: User, novoCargo: User['role']) => {
+    if (targetUser.email === user?.email) {
+      alert('Você não pode alterar o seu próprio perfil nesta listagem.');
+      return;
+    }
+    try {
+      await usuarioService.atualizarRole(targetUser.id, novoCargo);
+      setUsuarios((prev) =>
+        prev.map((u) =>
+          u.id === targetUser.id
+            ? { ...u, role: novoCargo, perfil: novoCargo as any }
+            : u
+        )
+      );
+      setSuccessMsg(`Perfil do usuário "${targetUser.nome}" alterado para ${novoCargo} com sucesso!`);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Erro ao alterar perfil do usuário.');
     }
   };
 
@@ -381,7 +401,29 @@ export const Usuarios: React.FC = () => {
 
                       {/* PERFIL */}
                       <td className="px-4 py-4">
-                        {getRoleBadge(u.role || u.perfil)}
+                        {isCurrentUser ? (
+                          getRoleBadge(u.role || u.perfil)
+                        ) : (
+                          <select
+                            value={u.role || u.perfil || 'PRODUTOR'}
+                            onChange={(e) => handleMudarRoleDireto(u, e.target.value as any)}
+                            className={`text-xs font-extrabold px-3 py-1.5 rounded-xl border focus:outline-none focus:ring-2 focus:ring-agro-primary cursor-pointer transition-all ${
+                              (u.role || u.perfil) === 'ADMIN'
+                                ? 'bg-purple-50 text-purple-900 border-purple-300 hover:bg-purple-100'
+                                : (u.role || u.perfil) === 'GESTOR'
+                                ? 'bg-emerald-50 text-emerald-900 border-emerald-300 hover:bg-emerald-100'
+                                : (u.role || u.perfil) === 'PRODUTOR'
+                                ? 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
+                                : 'bg-slate-50 text-slate-800 border-slate-300 hover:bg-slate-100'
+                            }`}
+                            title="Clique para alterar perfil (ex: Gestor para Produtor)"
+                          >
+                            <option value="PRODUTOR">🚜 Produtor Rural</option>
+                            <option value="GESTOR">💼 Gestor da Fazenda</option>
+                            <option value="ADMIN">👑 Administrador Geral</option>
+                            <option value="OPERADOR">🔧 Operador de Campo</option>
+                          </select>
+                        )}
                       </td>
 
                       {/* FAZENDA / TENANT */}

@@ -22,7 +22,7 @@ public class RegisterRequestDTO {
     @NotBlank(message = "Tenant ID é obrigatório para isolamento do cliente")
     private String tenantId;
 
-    private Role role = Role.GESTOR;
+    private Role role = Role.PRODUTOR;
 
     public RegisterRequestDTO() {}
 

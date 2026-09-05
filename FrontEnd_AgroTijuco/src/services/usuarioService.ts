@@ -13,92 +13,46 @@ export interface NovoUsuarioInput {
   produtorId?: string;
 }
 
-const USUARIOS_INICIAIS: User[] = [
-  {
-    id: 'f5e95a07-bc6e-4cd0-aecd-96b92883e932',
-    nome: 'Thaynná Yara',
-    email: 'thaynna.yara@agrotijuco.com.br',
-    perfil: 'ADMIN',
-    role: 'ADMIN',
-    tenantId: 'Fazenda AgroTijuco',
-    ativo: true,
-    createdAt: '2026-09-05T11:55:00.000Z',
-  },
-  {
-    id: '3ff5799f-c4d7-45b1-9426-1763e5b7d394',
-    nome: 'Admin AgroTijuco',
-    email: 'admin@agrotijuco.com.br',
-    perfil: 'ADMIN',
-    role: 'ADMIN',
-    tenantId: 'Fazenda AgroTijuco',
-    ativo: true,
-    createdAt: '2026-09-05T11:53:00.000Z',
-  },
-  {
-    id: 'b11deb4d-3b7d-4149-9cd6-890000000001',
-    nome: 'Walter Barreto',
-    email: 'walter.barreto@fazenda.com.br',
-    perfil: 'PRODUTOR',
-    role: 'PRODUTOR',
-    tenantId: 'Fazenda AgroTijuco',
-    produtorId: '9b1deb4d-3b7d-4149-9cd6-890000000001',
-    produtorNome: 'Walter Barreto',
-    ativo: true,
-    createdAt: '2026-09-05T11:58:00.000Z',
-  },
-  {
-    id: 'b11deb4d-3b7d-4149-9cd6-890000000002',
-    nome: 'Carlos Eduardo Ribeiro',
-    email: 'carlos.ribeiro@agro.com.br',
-    perfil: 'PRODUTOR',
-    role: 'PRODUTOR',
-    tenantId: 'Fazenda AgroTijuco',
-    produtorId: '9b1deb4d-3b7d-4149-9cd6-890000000002',
-    produtorNome: 'Carlos Eduardo Ribeiro',
-    ativo: true,
-    createdAt: '2026-09-05T12:00:00.000Z',
-  },
-  {
-    id: 'b11deb4d-3b7d-4149-9cd6-890000000003',
-    nome: 'Marcos Silveira (Operador de Campo)',
-    email: 'marcos.operador@agrotijuco.com.br',
-    perfil: 'OPERADOR',
-    role: 'OPERADOR',
-    tenantId: 'Fazenda AgroTijuco',
-    ativo: true,
-    createdAt: '2026-09-05T12:05:00.000Z',
-  }
-];
-
 function obterUsuariosLocais(): User[] {
   const data = localStorage.getItem(USERS_STORAGE_KEY);
-  if (!data) {
-    localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(USUARIOS_INICIAIS));
-    return USUARIOS_INICIAIS;
-  }
+  if (!data) return [];
   try {
-    return JSON.parse(data);
+    const list = JSON.parse(data);
+    if (!Array.isArray(list)) return [];
+    // Filtra e descarta qualquer resquício de mock antigo
+    return list.filter((u: User) => 
+      !u.email.includes('walter.barreto') && 
+      !u.email.includes('carlos.ribeiro') && 
+      !u.email.includes('marcos.operador') &&
+      !u.email.includes('admin@agrotijuco')
+    );
   } catch {
-    return USUARIOS_INICIAIS;
+    return [];
   }
 }
 
 function salvarUsuariosLocais(usuarios: User[]) {
-  localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(usuarios));
+  const limpos = (usuarios || []).filter((u: User) => 
+    !u.email.includes('walter.barreto') && 
+    !u.email.includes('carlos.ribeiro') && 
+    !u.email.includes('marcos.operador') &&
+    !u.email.includes('admin@agrotijuco')
+  );
+  localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(limpos));
 }
 
 export const usuarioService = {
   async listar(): Promise<User[]> {
     try {
       const response = await api.get<User[]>('/api/v1/usuarios');
-      if (Array.isArray(response.data) && response.data.length > 0) {
+      if (Array.isArray(response.data)) {
         salvarUsuariosLocais(response.data);
         return response.data;
       }
     } catch {
       try {
         const fallbackRes = await api.get<User[]>('/usuarios');
-        if (Array.isArray(fallbackRes.data) && fallbackRes.data.length > 0) {
+        if (Array.isArray(fallbackRes.data)) {
           salvarUsuariosLocais(fallbackRes.data);
           return fallbackRes.data;
         }

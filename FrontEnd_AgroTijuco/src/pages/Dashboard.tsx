@@ -239,7 +239,7 @@ export const Dashboard: React.FC = () => {
                 Produtor Responsável
               </span>
               <span className="text-slate-900 font-bold text-sm truncate block">
-                {selectedFarm.produtorNome || 'Walter Barreto'}
+                {selectedFarm.produtorNome || 'Não informado'}
               </span>
             </div>
 

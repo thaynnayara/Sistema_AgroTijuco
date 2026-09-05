@@ -5,44 +5,7 @@ import { propriedadeService } from '../services/propriedadeService';
 const SELECTED_FARM_KEY = '@AgroTijuco:selectedFarmId';
 const FARMS_CACHE_KEY = '@AgroTijuco:farmsCache';
 
-export const FAZENDAS_PADRAO: Propriedade[] = [
-  {
-    id: 'a11deb4d-3b7d-4149-9cd6-890000000001',
-    nome: 'Fazenda Santa Luzia',
-    nomeFazenda: 'Fazenda Santa Luzia',
-    municipio: 'Araguari/MG - Estrada Vicinal Km 12',
-    localizacao: 'Araguari/MG - Estrada Vicinal Km 12',
-    areaHectares: 250,
-    inscricaoEstadual: '001.234.567-89',
-    produtorId: '9b1deb4d-3b7d-4149-9cd6-890000000001',
-    produtorNome: 'Walter Barreto',
-    totalAnimais: 3,
-  },
-  {
-    id: 'a11deb4d-3b7d-4149-9cd6-890000000002',
-    nome: 'Fazenda Vista Alegre',
-    nomeFazenda: 'Fazenda Vista Alegre',
-    municipio: 'Uberlândia/MG - Rodovia BR-050 Km 45',
-    localizacao: 'Uberlândia/MG - Rodovia BR-050 Km 45',
-    areaHectares: 180,
-    inscricaoEstadual: '002.345.678-90',
-    produtorId: '9b1deb4d-3b7d-4149-9cd6-890000000001',
-    produtorNome: 'Walter Barreto',
-    totalAnimais: 1,
-  },
-  {
-    id: 'a11deb4d-3b7d-4149-9cd6-890000000003',
-    nome: 'Fazenda Boa Esperança',
-    nomeFazenda: 'Fazenda Boa Esperança',
-    municipio: 'Patrocínio/MG - Região dos Poncianos',
-    localizacao: 'Patrocínio/MG - Região dos Poncianos',
-    areaHectares: 340,
-    inscricaoEstadual: '003.456.789-01',
-    produtorId: '9b1deb4d-3b7d-4149-9cd6-890000000002',
-    produtorNome: 'Carlos Eduardo Ribeiro',
-    totalAnimais: 0,
-  }
-];
+export const FAZENDAS_PADRAO: Propriedade[] = [];
 
 interface FarmContextData {
   propriedades: Propriedade[];
@@ -63,10 +26,18 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) {
+          // Purga resquícios de mocks antigos de Walter Barreto / Santa Luzia
+          return parsed.filter((p: Propriedade) => 
+            !p.produtorNome?.includes('Walter Barreto') &&
+            !p.nomeFazenda?.includes('Santa Luzia') &&
+            !p.nomeFazenda?.includes('Vista Alegre') &&
+            !p.nomeFazenda?.includes('Boa Esperança')
+          );
+        }
       } catch {}
     }
-    return FAZENDAS_PADRAO;
+    return [];
   });
 
   const [selectedFarm, setSelectedFarmState] = useState<Propriedade | null>(null);
@@ -95,7 +66,7 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoadingFarms(true);
     try {
       const data = await propriedadeService.listarTodas();
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         const formatadas = data.map((p) => ({
           ...p,
           nome: p.nomeFazenda || p.nome || 'Fazenda sem nome',
@@ -104,10 +75,10 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setPropriedades(formatadas);
         localStorage.setItem(FARMS_CACHE_KEY, JSON.stringify(formatadas));
 
-        // Preserva seleção anterior ou seleciona a primeira
+        // Preserva seleção anterior ou seleciona a primeira se houver
         const savedId = localStorage.getItem(SELECTED_FARM_KEY);
-        const target = (savedId && formatadas.find((f) => f.id === savedId)) || formatadas[0];
-        setSelectedFarmState(target || null);
+        const target = (savedId && formatadas.find((f) => f.id === savedId)) || formatadas[0] || null;
+        setSelectedFarmState(target);
         return;
       }
     } catch {
@@ -116,19 +87,26 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoadingFarms(false);
     }
 
-    // Fallback para cache ou padrão
+    // Fallback apenas para cache local real e limpo
     const cached = localStorage.getItem(FARMS_CACHE_KEY);
-    let farms = FAZENDAS_PADRAO;
+    let farms: Propriedade[] = [];
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) farms = parsed;
+        if (Array.isArray(parsed)) {
+          farms = parsed.filter((p: Propriedade) => 
+            !p.produtorNome?.includes('Walter Barreto') &&
+            !p.nomeFazenda?.includes('Santa Luzia') &&
+            !p.nomeFazenda?.includes('Vista Alegre') &&
+            !p.nomeFazenda?.includes('Boa Esperança')
+          );
+        }
       } catch {}
     }
     setPropriedades(farms);
     const savedId = localStorage.getItem(SELECTED_FARM_KEY);
-    const target = (savedId && farms.find((f) => f.id === savedId)) || farms[0];
-    setSelectedFarmState(target || null);
+    const target = (savedId && farms.find((f) => f.id === savedId)) || farms[0] || null;
+    setSelectedFarmState(target);
   }, []);
 
   useEffect(() => {

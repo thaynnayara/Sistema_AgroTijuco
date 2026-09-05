@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { propriedadeService } from '../services/propriedadeService';
 import { produtorService } from '../services/produtorService';
 import { useAuth } from '../contexts/AuthContext';
-import { useFarm, FAZENDAS_PADRAO } from '../contexts/FarmContext';
+import { useFarm } from '../contexts/FarmContext';
 import type { Propriedade, Produtor } from '../types';
 import { 
   Home, 
@@ -61,11 +61,11 @@ export const Propriedades: React.FC = () => {
       ]);
       const initialFarms = (propsData && propsData.length > 0)
         ? propsData
-        : (contextPropriedades.length > 0 ? contextPropriedades : FAZENDAS_PADRAO);
+        : contextPropriedades;
       setPropriedades(initialFarms);
       setProdutores(prodsData || []);
     } catch {
-      setPropriedades(contextPropriedades.length > 0 ? contextPropriedades : FAZENDAS_PADRAO);
+      setPropriedades(contextPropriedades);
       setProdutores([]);
     } finally {
       setLoading(false);
@@ -148,10 +148,9 @@ export const Propriedades: React.FC = () => {
   };
 
   // Se for produtor, filtra apenas as fazendas atribuídas a ele
-  const produtorFiltroId = user?.produtorId || '9b1deb4d-3b7d-4149-9cd6-890000000001';
-  const displayPropriedades = isGestor
+  const displayPropriedades = isGestor || !user?.produtorId
     ? propriedades
-    : propriedades.filter((p) => p.produtorId === produtorFiltroId || p.produtorNome?.includes('Walter Barreto'));
+    : propriedades.filter((p) => p.produtorId === user.produtorId);
 
   const filtered = displayPropriedades.filter(
     (p) =>
