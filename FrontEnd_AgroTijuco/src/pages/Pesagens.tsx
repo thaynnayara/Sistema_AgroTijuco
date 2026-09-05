@@ -78,7 +78,7 @@ export const Pesagens: React.FC = () => {
         <div>
           <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
             <Scale className="w-7 h-7 text-agro-primary" />
-            Controle de Pesagens & GMD (RF04 / RN01)
+            Controle de Pesagens & Ganho Médio Diário (GMD)
           </h1>
           <p className="text-sm text-slate-600 mt-1">
             Cálculo automático do Ganho Médio Diário: <span className="font-semibold text-agro-forest">(Peso Atual - Peso Anterior) / Dias decorridos</span>
@@ -94,12 +94,12 @@ export const Pesagens: React.FC = () => {
         </button>
       </div>
 
-      {/* BANNER REGRA DE NEGÓCIO RN01 */}
+      {/* BANNER GMD */}
       <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 shadow-xs flex items-center gap-3">
         <TrendingUp className="w-6 h-6 text-emerald-600 shrink-0" />
         <div className="text-xs text-emerald-900">
-          <span className="font-bold block text-sm">Regra de Negócio RN01 Ativa: Cálculo Automático do GMD</span>
-          Sempre que uma pesagem é lançada, o sistema localiza a pesagem anterior do mesmo animal no banco de dados e calcula com precisão a taxa de ganho em kg/dia.
+          <span className="font-bold block text-sm">Cálculo Automático do GMD</span>
+          Ao registrar uma nova pesagem, o sistema busca a pesagem anterior do mesmo animal e calcula a taxa de ganho em kg/dia.
         </div>
       </div>
 
@@ -137,7 +137,7 @@ export const Pesagens: React.FC = () => {
                   <th className="py-3.5 px-4">Animal (Brinco)</th>
                   <th className="py-3.5 px-4">Data Pesagem</th>
                   <th className="py-3.5 px-4">Peso Aferido</th>
-                  <th className="py-3.5 px-4">Ganho Médio Diário (RN01)</th>
+                  <th className="py-3.5 px-4">Ganho Médio Diário (GMD)</th>
                   <th className="py-3.5 px-4">Intervalo</th>
                   <th className="py-3.5 px-4">Observações</th>
                 </tr>

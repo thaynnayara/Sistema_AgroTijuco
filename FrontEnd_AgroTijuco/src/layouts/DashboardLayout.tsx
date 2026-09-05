@@ -29,8 +29,7 @@ export const DashboardLayout: React.FC = () => {
   const { 
     user, 
     logout, 
-    isGestor, 
-    switchUserRole
+    isGestor
   } = useAuth();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -97,7 +96,7 @@ export const DashboardLayout: React.FC = () => {
     navigate('/login');
   };
 
-  const displayName = user?.nome || (isGestor ? 'Thaynná Yara' : 'João da Silva Sauro');
+  const displayName = user?.nome || (isGestor ? 'Gestor' : 'Produtor');
 
   return (
     <div className="min-h-screen bg-agro-bg flex flex-col font-sans">
@@ -128,9 +127,9 @@ export const DashboardLayout: React.FC = () => {
             </div>
           </div>
 
-          {/* Offline Sync Status & Role Switcher */}
+          {/* Offline Sync Status */}
           <div className="flex items-center space-x-2 sm:space-x-3">
-            {/* RNF01 / RNF02 Indicator */}
+            {/* Status Indicator */}
             <div className="flex items-center space-x-2 bg-white/15 px-3 py-1.5 rounded-xl border border-white/20 text-xs">
               {isOnline ? (
                 <div className="flex items-center space-x-1.5 text-emerald-300 font-medium">
@@ -157,15 +156,6 @@ export const DashboardLayout: React.FC = () => {
               )}
             </div>
 
-            {/* Alternar Perfil */}
-            <button
-              onClick={() => switchUserRole(isGestor ? 'PRODUTOR' : 'GESTOR')}
-              title={isGestor ? "Alternar para simular a visão do Produtor Rural" : "Voltar para o perfil de Gestora Geral"}
-              className="hidden sm:flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-white/15 hover:bg-white/25 text-white border border-white/20 transition-colors cursor-pointer"
-            >
-              {isGestor ? <span>🌾 Visão Produtor</span> : <span>👑 Visão Gestora</span>}
-            </button>
-
             {/* User Profile & Logout */}
             <div className="flex items-center space-x-2.5 pl-2 sm:pl-3 border-l border-white/20">
               <div className="text-right hidden sm:block">
@@ -173,7 +163,7 @@ export const DashboardLayout: React.FC = () => {
                   {displayName}
                 </div>
                 <div className="text-xs text-agro-secondary/90">
-                  {isGestor ? '👑 Gestora Geral' : '🌾 Produtor Rural'}
+                  {isGestor ? 'Administrador / Gestor' : 'Produtor Rural'}
                 </div>
               </div>
 

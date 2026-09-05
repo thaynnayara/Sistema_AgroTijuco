@@ -13,10 +13,10 @@ export const Estoque: React.FC = () => {
   const [qtdMovimento, setQtdMovimento] = useState<number>(10);
 
   const [form, setForm] = useState({
-    nomeItem: 'Ração Confinamento 18%',
+    nomeItem: '',
     categoria: 'RACAO' as ItemEstoque['categoria'],
-    quantidadeAtual: 1500,
-    quantidadeMinima: 500,
+    quantidadeAtual: 0,
+    quantidadeMinima: 10,
     unidadeMedida: 'KG' as ItemEstoque['unidadeMedida']
   });
 
@@ -27,8 +27,8 @@ export const Estoque: React.FC = () => {
   const carregarPropriedades = async () => {
     try {
       const list = await propriedadeService.listarTodas();
-      setPropriedades(list);
-      if (list.length > 0 && list[0].id) {
+      setPropriedades(list || []);
+      if (list && list.length > 0 && list[0].id) {
         setPropriedadeId(list[0].id);
         carregarEstoque(list[0].id);
       }
@@ -38,9 +38,10 @@ export const Estoque: React.FC = () => {
   };
 
   const carregarEstoque = async (pId: string) => {
+    if (!pId) return;
     try {
       const list = await estoqueService.listarPorPropriedade(pId);
-      setItens(list);
+      setItens(list || []);
     } catch (err) {
       console.error(err);
     }
@@ -48,11 +49,22 @@ export const Estoque: React.FC = () => {
 
   const handleCadastro = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!propriedadeId) return alert('Selecione uma fazenda.');
+    if (!propriedadeId) {
+      alert('Selecione uma fazenda para vincular o insumo.');
+      return;
+    }
     try {
       await estoqueService.cadastrar(propriedadeId, form);
       setModalCadastro(false);
+      setForm({
+        nomeItem: '',
+        categoria: 'RACAO',
+        quantidadeAtual: 0,
+        quantidadeMinima: 10,
+        unidadeMedida: 'KG'
+      });
       carregarEstoque(propriedadeId);
+      alert('Insumo cadastrado com sucesso!');
     } catch (err) {
       alert('Erro ao cadastrar item de estoque.');
     }
@@ -78,10 +90,10 @@ export const Estoque: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
             <Boxes className="w-7 h-7 text-agro-primary" />
-            Gestão de Estoque & Alertas (RF08)
+            Gestão de Estoque & Insumos
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Controle de entrada e saída de insumos (rações, medicamentos, sal mineral) e alertas de estoque crítico
+            Controle de entrada e saída de insumos (rações, medicamentos, sal mineral) e alertas de estoque
           </p>
         </div>
 
@@ -94,9 +106,13 @@ export const Estoque: React.FC = () => {
             }}
             className="px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700"
           >
-            {propriedades.map(p => (
-              <option key={p.id} value={p.id}>{p.nomeFazenda || p.nome}</option>
-            ))}
+            {propriedades.length === 0 ? (
+              <option value="">Nenhuma fazenda cadastrada</option>
+            ) : (
+              propriedades.map(p => (
+                <option key={p.id} value={p.id}>{p.nomeFazenda || p.nome}</option>
+              ))
+            )}
           </select>
 
           <button
@@ -148,7 +164,9 @@ export const Estoque: React.FC = () => {
               {itens.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-6 text-center text-slate-400 italic">
-                    Nenhum insumo em estoque cadastrado nesta propriedade.
+                    {propriedades.length === 0
+                      ? 'Nenhuma fazenda encontrada. Cadastre uma fazenda para gerenciar estoque.'
+                      : 'Nenhum insumo em estoque cadastrado nesta propriedade.'}
                   </td>
                 </tr>
               ) : (
@@ -200,13 +218,29 @@ export const Estoque: React.FC = () => {
       {modalCadastro && (
         <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
-            <h3 className="text-lg font-bold text-slate-800">Cadastrar Insumo / Item no Estoque</h3>
+            <h3 className="text-lg font-bold text-slate-800">Cadastrar Insumo no Estoque</h3>
             <form onSubmit={handleCadastro} className="space-y-3">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Nome do Item</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Fazenda / Propriedade Responsável</label>
+                <select
+                  value={propriedadeId}
+                  onChange={e => setPropriedadeId(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 bg-slate-50"
+                >
+                  <option value="">-- Selecione a Fazenda --</option>
+                  {propriedades.map(p => (
+                    <option key={p.id} value={p.id}>{p.nomeFazenda || p.nome}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Nome do Insumo</label>
                 <input
                   type="text"
                   required
+                  placeholder="Ex: Ração Confinamento 18%, Sal Mineral, Ivermectina..."
                   value={form.nomeItem}
                   onChange={e => setForm({...form, nomeItem: e.target.value})}
                   className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"

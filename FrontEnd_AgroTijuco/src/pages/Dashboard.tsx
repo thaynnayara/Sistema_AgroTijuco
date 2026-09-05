@@ -21,7 +21,7 @@ import { propriedadeService } from '../services/propriedadeService';
 
 export const Dashboard: React.FC = () => {
   const { user, isGestor } = useAuth();
-  const userName = user?.nome || (isGestor ? 'Thaynná Yara' : 'Dejean');
+  const userName = user?.nome || (isGestor ? 'Gestor' : 'Produtor');
 
   const [desfrute, setDesfrute] = useState<number>(18.5);
   const [carenciasCount, setCarenciasCount] = useState<number>(0);
@@ -51,7 +51,7 @@ export const Dashboard: React.FC = () => {
 
   const stats = [
     {
-      title: 'Taxa de Desfrute (RN03)',
+      title: 'Taxa de Desfrute',
       value: `${desfrute}%`,
       change: 'Comercializados / Total Rebanho',
       icon: Percent,
@@ -59,7 +59,7 @@ export const Dashboard: React.FC = () => {
       path: '/financeiro',
     },
     {
-      title: 'Carência Sanitária (RN02)',
+      title: 'Carência Sanitária',
       value: `${carenciasCount} Bloqueados`,
       change: 'Animais em isolamento pós-vacina',
       icon: Syringe,
@@ -67,7 +67,7 @@ export const Dashboard: React.FC = () => {
       path: '/sanidade',
     },
     {
-      title: 'Estoque de Insumos (RF08)',
+      title: 'Estoque de Insumos',
       value: `${estoqueCriticoCount} Críticos`,
       change: 'Rações / Medicamentos no nível mínimo',
       icon: Boxes,
@@ -75,7 +75,7 @@ export const Dashboard: React.FC = () => {
       path: '/estoque',
     },
     {
-      title: 'Ganho Médio Diário (RN01)',
+      title: 'Ganho Médio Diário',
       value: '1.18 kg/dia',
       change: '(Peso Atual - Anterior) / Dias',
       icon: Scale,
@@ -100,7 +100,7 @@ export const Dashboard: React.FC = () => {
         <div className="relative z-10 max-w-2xl">
           <div className="inline-flex items-center space-x-2 bg-white/15 backdrop-blur-xs px-3 py-1 rounded-full text-xs font-semibold text-agro-secondary mb-3 border border-white/20">
             <Sparkles className="w-3.5 h-3.5 text-agro-secondary" />
-            <span>{isGestor ? 'Gestão Geral B2B SaaS' : 'Portal do Produtor Rural'}</span>
+            <span>{isGestor ? 'Gestão da Fazenda' : 'Portal do Produtor Rural'}</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
             Olá, {userName}!

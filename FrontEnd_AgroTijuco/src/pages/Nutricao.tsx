@@ -11,12 +11,12 @@ export const Nutricao: React.FC = () => {
   const [modalAberta, setModalAberta] = useState(false);
 
   const [form, setForm] = useState({
-    nomeDieta: 'Ração de Engorda Confinamento 18% PB',
-    ingredientes: 'Milho Moído (60%), Farelo de Soja (25%), Núcleo Mineral Bovino (5%), Silagem de Milho (10%)',
-    quantidadeKgCabeca: 4.5,
-    loteDestino: 'Lote Boi Gordo Recria',
+    nomeDieta: '',
+    ingredientes: '',
+    quantidadeKgCabeca: 3.5,
+    loteDestino: '',
     dataTrato: new Date().toISOString().split('T')[0],
-    observacoes: 'Fornecer em 2 tratos diários (07:00h e 16:00h).'
+    observacoes: ''
   });
 
   useEffect(() => {
@@ -26,8 +26,8 @@ export const Nutricao: React.FC = () => {
   const carregarPropriedades = async () => {
     try {
       const list = await propriedadeService.listarTodas();
-      setPropriedades(list);
-      if (list.length > 0 && list[0].id) {
+      setPropriedades(list || []);
+      if (list && list.length > 0 && list[0].id) {
         setPropriedadeId(list[0].id);
         carregarDietas(list[0].id);
       }
@@ -37,9 +37,10 @@ export const Nutricao: React.FC = () => {
   };
 
   const carregarDietas = async (pId: string) => {
+    if (!pId) return;
     try {
       const list = await nutricaoService.listarPorPropriedade(pId);
-      setDietas(list);
+      setDietas(list || []);
     } catch (err) {
       console.error(err);
     }
@@ -47,11 +48,23 @@ export const Nutricao: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!propriedadeId) return alert('Selecione uma fazenda.');
+    if (!propriedadeId) {
+      alert('Selecione uma fazenda para registrar a dieta.');
+      return;
+    }
     try {
       await nutricaoService.registrar(propriedadeId, form);
       setModalAberta(false);
+      setForm({
+        nomeDieta: '',
+        ingredientes: '',
+        quantidadeKgCabeca: 3.5,
+        loteDestino: '',
+        dataTrato: new Date().toISOString().split('T')[0],
+        observacoes: ''
+      });
       carregarDietas(propriedadeId);
+      alert('Dieta registrada com sucesso!');
     } catch (err) {
       alert('Erro ao registrar dieta.');
     }
@@ -64,10 +77,10 @@ export const Nutricao: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
             <Apple className="w-7 h-7 text-agro-primary" />
-            Controle Nutricional & Trato Diário (RF06)
+            Controle Nutricional & Trato Diário
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Formulação de dietas, suplementação mineral e controle de trato aos lotes de confinamento/recria
+            Formulação de dietas, suplementação mineral e controle de trato aos lotes
           </p>
         </div>
 
@@ -80,9 +93,13 @@ export const Nutricao: React.FC = () => {
             }}
             className="px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700"
           >
-            {propriedades.map(p => (
-              <option key={p.id} value={p.id}>{p.nomeFazenda || p.nome}</option>
-            ))}
+            {propriedades.length === 0 ? (
+              <option value="">Nenhuma fazenda cadastrada</option>
+            ) : (
+              propriedades.map(p => (
+                <option key={p.id} value={p.id}>{p.nomeFazenda || p.nome}</option>
+              ))
+            )}
           </select>
 
           <button
@@ -117,7 +134,9 @@ export const Nutricao: React.FC = () => {
               {dietas.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-4 py-6 text-center text-slate-400 italic">
-                    Nenhuma dieta formulada para esta fazenda.
+                    {propriedades.length === 0
+                      ? 'Cadastre uma fazenda para formular dietas.'
+                      : 'Nenhuma dieta formulada para esta fazenda.'}
                   </td>
                 </tr>
               ) : (
@@ -147,10 +166,26 @@ export const Nutricao: React.FC = () => {
             <h3 className="text-lg font-bold text-slate-800">Formular Nova Dieta do Trato</h3>
             <form onSubmit={handleSubmit} className="space-y-3">
               <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Fazenda / Propriedade</label>
+                <select
+                  value={propriedadeId}
+                  onChange={e => setPropriedadeId(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 bg-slate-50"
+                >
+                  <option value="">-- Selecione a Fazenda --</option>
+                  {propriedades.map(p => (
+                    <option key={p.id} value={p.id}>{p.nomeFazenda || p.nome}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Nome da Dieta</label>
                 <input
                   type="text"
                   required
+                  placeholder="Ex: Ração Engorda 18% PB"
                   value={form.nomeDieta}
                   onChange={e => setForm({...form, nomeDieta: e.target.value})}
                   className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"

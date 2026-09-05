@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { produtorService } from '../services/produtorService';
+import { authService } from '../services/authService';
 import { useAuth } from '../contexts/AuthContext';
 import type { Produtor } from '../types';
 import { 
@@ -16,7 +17,8 @@ import {
   Mail, 
   Phone,
   MapPin,
-  Home
+  Home,
+  UserPlus
 } from 'lucide-react';
 
 const produtorSchema = z.object({
@@ -30,13 +32,22 @@ const produtorSchema = z.object({
 type ProdutorFormData = z.infer<typeof produtorSchema>;
 
 export const Produtores: React.FC = () => {
-  const { showTechnicalDetails, isGestor } = useAuth();
+  const { showTechnicalDetails, isGestor, user } = useAuth();
   const [produtores, setProdutores] = useState<Produtor[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [modalOpen, setModalOpen] = useState<boolean>(false);
+  const [modalUsuarioOpen, setModalUsuarioOpen] = useState<boolean>(false);
+  const [submittingUser, setSubmittingUser] = useState<boolean>(false);
   const [createdUuid, setCreatedUuid] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
+
+  const [formUsuario, setFormUsuario] = useState({
+    nome: '',
+    email: '',
+    senha: '',
+    role: 'GESTOR' as 'GESTOR' | 'PRODUTOR'
+  });
 
   const {
     register,
@@ -86,6 +97,35 @@ export const Produtores: React.FC = () => {
     }
   };
 
+  const handleCadastrarUsuario = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formUsuario.nome || !formUsuario.email || !formUsuario.senha) {
+      return alert('Preencha todos os campos obrigatórios.');
+    }
+    setSubmittingUser(true);
+    try {
+      await authService.cadastrarNovoUsuario({
+        nome: formUsuario.nome,
+        email: formUsuario.email,
+        senha: formUsuario.senha,
+        tenantId: user?.tenantId || 'Fazenda AgroTijuco',
+        role: formUsuario.role,
+      });
+      setModalUsuarioOpen(false);
+      setFormUsuario({
+        nome: '',
+        email: '',
+        senha: '',
+        role: 'GESTOR'
+      });
+      alert(`Usuário cadastrado com sucesso com perfil de ${formUsuario.role === 'GESTOR' ? 'Administrador / Gestor' : 'Produtor'}!`);
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Erro ao cadastrar novo usuário.');
+    } finally {
+      setSubmittingUser(false);
+    }
+  };
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
   };
@@ -96,9 +136,9 @@ export const Produtores: React.FC = () => {
         <div className="w-12 h-12 bg-amber-100 text-amber-800 rounded-2xl flex items-center justify-center mx-auto mb-3">
           <Users className="w-6 h-6" />
         </div>
-        <h2 className="text-xl font-bold text-slate-900 mb-2">Acesso Exclusivo da Gestora</h2>
+        <h2 className="text-xl font-bold text-slate-900 mb-2">Acesso Restrito</h2>
         <p className="text-sm text-slate-600 mb-6 leading-relaxed">
-          Como produtor, o cadastro e o gerenciamento de outros produtores rurais não estão disponíveis. A <strong>Gestora Thaynná Yara</strong> é responsável por cadastrar os produtores e liberar as fazendas correspondentes.
+          O cadastro e o gerenciamento de produtores e novos usuários são restritos aos administradores e gestores da fazenda.
         </p>
         <a
           href="/propriedades"
@@ -125,28 +165,33 @@ export const Produtores: React.FC = () => {
         <div>
           <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight flex items-center">
             <Users className="w-7 h-7 text-agro-primary mr-2" />
-            Produtores Rurais
+            Produtores & Equipe
           </h1>
           <p className="text-sm text-slate-600">
-            Cadastre os produtores e aponte quais fazendas pertencem a cada um.
-            {showTechnicalDetails && (
-              <span className="font-mono text-xs text-agro-primary ml-2 bg-agro-secondary/60 px-2 py-0.5 rounded">
-                POST /produtores (Exclusivo ROLE_GESTOR)
-              </span>
-            )}
+            Cadastre os produtores rurais e gerencie novos usuários e administradores da sua fazenda.
           </p>
         </div>
 
-        <button
-          onClick={() => {
-            setCreatedUuid(null);
-            setModalOpen(true);
-          }}
-          className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-agro-primary hover:bg-agro-primary-hover text-white font-semibold text-sm shadow-sm transition-all cursor-pointer"
-        >
-          <Plus className="w-5 h-5 mr-1.5" />
-          Cadastrar Novo Produtor
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setModalUsuarioOpen(true)}
+            className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-agro-secondary text-agro-forest hover:bg-agro-secondary/80 font-bold text-sm shadow-xs transition-all cursor-pointer"
+          >
+            <UserPlus className="w-4 h-4 mr-1.5" />
+            Cadastrar Novo Administrador / Usuário
+          </button>
+
+          <button
+            onClick={() => {
+              setCreatedUuid(null);
+              setModalOpen(true);
+            }}
+            className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-agro-primary hover:bg-agro-primary-hover text-white font-semibold text-sm shadow-sm transition-all cursor-pointer"
+          >
+            <Plus className="w-5 h-5 mr-1.5" />
+            Cadastrar Novo Produtor
+          </button>
+        </div>
       </div>
 
       <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-card flex items-center">
@@ -365,6 +410,94 @@ export const Produtores: React.FC = () => {
                 >
                   {submitting && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
                   Salvar Produtor
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE CADASTRO DE USUÁRIO / ADMINISTRADOR */}
+      {modalUsuarioOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 relative space-y-4">
+            <div className="flex items-center space-x-2.5">
+              <div className="p-2 bg-agro-secondary/60 text-agro-forest rounded-xl">
+                <UserPlus className="w-6 h-6 text-agro-primary" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">Novo Usuário da Equipe</h2>
+                <p className="text-xs text-slate-500">Crie o acesso para outro administrador ou produtor da fazenda</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleCadastrarUsuario} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Nome Completo</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ex: Carlos Andrade"
+                  value={formUsuario.nome}
+                  onChange={e => setFormUsuario({...formUsuario, nome: e.target.value})}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">E-mail de Login</label>
+                <input
+                  type="email"
+                  required
+                  placeholder="carlos@fazenda.com.br"
+                  value={formUsuario.email}
+                  onChange={e => setFormUsuario({...formUsuario, email: e.target.value})}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Senha Provisória</label>
+                <input
+                  type="password"
+                  required
+                  placeholder="••••••••"
+                  value={formUsuario.senha}
+                  onChange={e => setFormUsuario({...formUsuario, senha: e.target.value})}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Perfil de Acesso</label>
+                <select
+                  value={formUsuario.role}
+                  onChange={e => setFormUsuario({...formUsuario, role: e.target.value as any})}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800"
+                >
+                  <option value="GESTOR">Administrador / Gestor Geral (Acesso Total)</option>
+                  <option value="PRODUTOR">Produtor Rural (Acesso às suas Fazendas)</option>
+                </select>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Como administrador, você pode conceder acesso de gestão ou operacional a membros da sua equipe.
+                </p>
+              </div>
+
+              <div className="pt-3 flex items-center justify-end space-x-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setModalUsuarioOpen(false)}
+                  className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingUser}
+                  className="px-5 py-2 text-sm font-semibold text-white bg-agro-primary hover:bg-agro-primary-hover rounded-xl flex items-center shadow-sm cursor-pointer"
+                >
+                  {submittingUser && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                  Cadastrar Usuário
                 </button>
               </div>
             </form>

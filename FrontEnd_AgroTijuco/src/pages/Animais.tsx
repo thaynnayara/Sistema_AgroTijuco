@@ -25,7 +25,7 @@ export const Animais: React.FC = () => {
   const [formIndividual, setFormIndividual] = useState({
     brinco: '',
     rfid: '',
-    lote: 'Lote Recria 2026',
+    lote: '',
     raca: 'Nelore',
     sexo: 'M' as 'M' | 'F',
     dataNascimento: new Date().toISOString().split('T')[0],
@@ -33,11 +33,11 @@ export const Animais: React.FC = () => {
   });
 
   const [formLote, setFormLote] = useState<BatchAnimalInput>({
-    prefixoBrinco: 'NLR-2026',
+    prefixoBrinco: '',
     quantidade: 10,
     sexo: 'M',
-    raca: 'Nelore Mocho',
-    lote: 'Lote Garrotes Recria',
+    raca: 'Nelore',
+    lote: '',
     dataNascimento: new Date().toISOString().split('T')[0]
   });
 
@@ -97,8 +97,7 @@ export const Animais: React.FC = () => {
       loadData();
       alert(`Status do animal ${animal.brinco} alterado para ${novoStatus}!`);
     } catch (err: any) {
-      // RN02 Bloqueio por Carência Sanitária
-      alert(err.response?.data?.message || `BLOQUEIO SANITÁRIO (RN02): Não foi possível alterar o status do animal ${animal.brinco}.`);
+      alert(err.response?.data?.message || `Bloqueio Sanitário: Não foi possível alterar o status do animal ${animal.brinco} pois está em período de carência.`);
     }
   };
 
@@ -117,10 +116,10 @@ export const Animais: React.FC = () => {
         <div>
           <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
             <Beef className="w-7 h-7 text-agro-primary" />
-            Rebanho, Brincos & RFID (RF01)
+            Controle de Rebanho & Identificação
           </h1>
           <p className="text-sm text-slate-600 mt-1">
-            Cadastro individual ou em lote de animais, brincos visíveis, tags eletrônicas RFID e controle de carência sanitária (RN02).
+            Cadastro individual ou em lote de animais, brincos visíveis, tags eletrônicas RFID e controle de carência sanitária.
           </p>
         </div>
 
@@ -130,7 +129,7 @@ export const Animais: React.FC = () => {
             className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-agro-secondary text-agro-forest hover:bg-agro-secondary/80 font-bold text-sm shadow-xs transition-all cursor-pointer"
           >
             <Layers className="w-4 h-4 mr-1.5" />
-            RF01 - Cadastro em Lote
+            Cadastro em Lote
           </button>
 
           <button
@@ -184,11 +183,11 @@ export const Animais: React.FC = () => {
             <table className="w-full text-left text-sm text-slate-700">
               <thead className="bg-agro-secondary/40 text-agro-forest font-semibold border-b border-agro-secondary">
                 <tr>
-                  <th className="py-3.5 px-4">Brinco Visível (RF01)</th>
-                  <th className="py-3.5 px-4">RFID Eletrônico (RF01)</th>
+                  <th className="py-3.5 px-4">Brinco Visível</th>
+                  <th className="py-3.5 px-4">RFID Eletrônico</th>
                   <th className="py-3.5 px-4">Lote / Piquete</th>
                   <th className="py-3.5 px-4">Raça & Sexo</th>
-                  <th className="py-3.5 px-4">Status & Carência (RN02)</th>
+                  <th className="py-3.5 px-4">Status Sanitário</th>
                   <th className="py-3.5 px-4 text-right">Ações de Manejo</th>
                 </tr>
               </thead>
@@ -228,7 +227,7 @@ export const Animais: React.FC = () => {
                     <td className="py-3.5 px-4 text-xs">
                       {animal.emCarenciaSanitaria ? (
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-red-100 text-red-800 font-bold text-xs rounded-lg animate-pulse">
-                          <ShieldAlert className="w-3.5 h-3.5" /> RN02: Carência até {animal.dataFimCarencia}
+                          <ShieldAlert className="w-3.5 h-3.5" /> Em Carência até {animal.dataFimCarencia}
                         </span>
                       ) : (
                         <span className="inline-flex items-center bg-emerald-50 text-emerald-800 font-bold text-xs px-2.5 py-1 rounded-lg">
@@ -247,7 +246,7 @@ export const Animais: React.FC = () => {
                       <button
                         onClick={() => handleMudarStatus(animal, 'ABATIDO')}
                         className="px-2 py-1 bg-amber-100 text-amber-800 font-bold text-xs rounded hover:bg-amber-200 cursor-pointer"
-                        title="Marcar como Abatido (Sujeito a RN02)"
+                        title="Marcar como Abatido"
                       >
                         Abater
                       </button>
@@ -266,6 +265,21 @@ export const Animais: React.FC = () => {
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
             <h2 className="text-xl font-bold text-slate-900">Cadastrar Animal Individual</h2>
             <form onSubmit={handleCadastroIndividual} className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Fazenda / Propriedade</label>
+                <select
+                  required
+                  value={selectedPropId}
+                  onChange={e => setSelectedPropId(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800"
+                >
+                  <option value="">Selecione a fazenda...</option>
+                  {propriedades.map(p => (
+                    <option key={p.id} value={p.id}>{p.nomeFazenda || p.nome}</option>
+                  ))}
+                </select>
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Brinco Visível (Obrigatório)</label>
                 <input
@@ -317,6 +331,7 @@ export const Animais: React.FC = () => {
                 <label className="block text-xs font-bold text-slate-700 mb-1">Lote de Manejo</label>
                 <input
                   type="text"
+                  placeholder="Ex: Lote 1 - Recria"
                   value={formIndividual.lote}
                   onChange={e => setFormIndividual({...formIndividual, lote: e.target.value})}
                   className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
@@ -349,9 +364,24 @@ export const Animais: React.FC = () => {
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
             <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
               <Layers className="w-5 h-5 text-agro-primary" />
-              RF01 - Cadastro em Lote de Animais
+              Cadastro em Lote de Animais
             </h2>
             <form onSubmit={handleCadastroLote} className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Fazenda / Propriedade</label>
+                <select
+                  required
+                  value={selectedPropId}
+                  onChange={e => setSelectedPropId(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800"
+                >
+                  <option value="">Selecione a fazenda...</option>
+                  {propriedades.map(p => (
+                    <option key={p.id} value={p.id}>{p.nomeFazenda || p.nome}</option>
+                  ))}
+                </select>
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Prefixo do Brinco</label>
                 <input
@@ -406,6 +436,7 @@ export const Animais: React.FC = () => {
                 <input
                   type="text"
                   required
+                  placeholder="Ex: Garrotes Recria"
                   value={formLote.lote}
                   onChange={e => setFormLote({...formLote, lote: e.target.value})}
                   className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"

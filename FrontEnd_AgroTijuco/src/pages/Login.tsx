@@ -14,9 +14,8 @@ const loginSchema = z.object({
 
 const registerSchema = z.object({
   nome: z.string().min(3, 'Nome completo deve ter no mínimo 3 caracteres'),
-  tenantId: z.string().min(3, 'Informe o nome da sua fazenda ou empresa'),
+  tenantId: z.string().min(3, 'Informe o nome da sua fazenda ou propriedade'),
   email: z.string().min(1, 'E-mail é obrigatório').email('Digite um e-mail válido'),
-  role: z.enum(['GESTOR', 'PRODUTOR']),
   senha: z.string().min(8, 'A senha deve ter no mínimo 8 caracteres'),
   confirmarSenha: z.string().min(8, 'Confirmação de senha obrigatória'),
 }).refine((data) => data.senha === data.confirmarSenha, {
@@ -61,7 +60,6 @@ export const Login: React.FC = () => {
       nome: '',
       tenantId: '',
       email: '',
-      role: 'GESTOR',
       senha: '',
       confirmarSenha: '',
     },
@@ -101,7 +99,7 @@ export const Login: React.FC = () => {
           email: data.email,
           senha: data.senha,
           tenantId: data.tenantId,
-          role: data.role,
+          role: 'GESTOR',
         },
         true
       );
@@ -286,7 +284,7 @@ export const Login: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                  Nome da Fazenda / Organização (Isolamento de Dados)
+                  Nome da Fazenda / Propriedade
                 </label>
                 <div className="relative rounded-xl shadow-xs">
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -304,34 +302,24 @@ export const Login: React.FC = () => {
                 )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                    E-mail
-                  </label>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                  E-mail de Acesso
+                </label>
+                <div className="relative rounded-xl shadow-xs">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <Mail className="h-5 w-5 text-agro-primary/70" />
+                  </div>
                   <input
                     type="email"
                     {...registerSignUpField('email')}
-                    className="block w-full px-3 py-2.5 bg-slate-50 border border-slate-200 focus:border-agro-primary focus:ring-agro-primary rounded-xl focus:outline-none focus:ring-2 focus:bg-white text-sm text-slate-900 transition-colors"
+                    className="block w-full pl-10 pr-3 py-2.5 bg-slate-50 border border-slate-200 focus:border-agro-primary focus:ring-agro-primary rounded-xl focus:outline-none focus:ring-2 focus:bg-white text-sm text-slate-900 transition-colors"
                     placeholder="contato@fazenda.com.br"
                   />
-                  {registerErrors.email && (
-                    <p className="mt-1 text-xs text-red-500">{registerErrors.email.message}</p>
-                  )}
                 </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                    Perfil
-                  </label>
-                  <select
-                    {...registerSignUpField('role')}
-                    className="block w-full px-3 py-2.5 bg-slate-50 border border-slate-200 focus:border-agro-primary focus:ring-agro-primary rounded-xl focus:outline-none focus:ring-2 focus:bg-white text-sm text-slate-900 transition-colors"
-                  >
-                    <option value="GESTOR">Gestora / Administradora</option>
-                    <option value="PRODUTOR">Produtor Rural</option>
-                  </select>
-                </div>
+                {registerErrors.email && (
+                  <p className="mt-1 text-xs text-red-500">{registerErrors.email.message}</p>
+                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -374,7 +362,7 @@ export const Login: React.FC = () => {
                 {isSubmitting ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                    Criando sua conta segura...
+                    Criando sua conta...
                   </>
                 ) : (
                   <>
@@ -388,11 +376,12 @@ export const Login: React.FC = () => {
 
           <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-center text-xs text-slate-500 gap-1.5">
             <ShieldCheck className="w-4 h-4 text-agro-primary" />
-            <span>Isolamento Multi-Tenant e Criptografia BCrypt Ativos</span>
+            <span>Plataforma Segura e Confiável</span>
           </div>
         </div>
       </div>
     </div>
   );
 };
+
 

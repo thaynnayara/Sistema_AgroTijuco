@@ -15,9 +15,9 @@ export const Financeiro: React.FC = () => {
   const [modalAberta, setModalAberta] = useState(false);
 
   const [form, setForm] = useState({
-    descricao: 'Compra de Suplemento Mineral Ureia e Sal',
+    descricao: '',
     categoria: 'RACAO' as DespesaOperacional['categoria'],
-    valor: 4500,
+    valor: 0,
     dataDespesa: new Date().toISOString().split('T')[0],
     tipoProducao: 'CORTE_ARROBA' as DespesaOperacional['tipoProducao'],
     totalProduzidoPeriodo: 350
@@ -30,8 +30,8 @@ export const Financeiro: React.FC = () => {
   const carregarPropriedades = async () => {
     try {
       const list = await propriedadeService.listarTodas();
-      setPropriedades(list);
-      if (list.length > 0 && list[0].id) {
+      setPropriedades(list || []);
+      if (list && list.length > 0 && list[0].id) {
         setPropriedadeId(list[0].id);
         carregarFinanceiro(list[0].id, arrobasProduzidas, litrosLeiteProduzidos);
       }
@@ -41,12 +41,13 @@ export const Financeiro: React.FC = () => {
   };
 
   const carregarFinanceiro = async (pId: string, arrobas: number, litros: number) => {
+    if (!pId) return;
     try {
       const [listDespesas, apuracao] = await Promise.all([
         financeiroService.listarDespesas(pId),
         financeiroService.apurarCustos(pId, arrobas, litros)
       ]);
-      setDespesas(listDespesas);
+      setDespesas(listDespesas || []);
       setResumo(apuracao);
     } catch (err) {
       console.error(err);
@@ -61,11 +62,23 @@ export const Financeiro: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!propriedadeId) return alert('Selecione uma fazenda.');
+    if (!propriedadeId) {
+      alert('Selecione uma fazenda para lançar a despesa.');
+      return;
+    }
     try {
       await financeiroService.registrarDespesa(propriedadeId, form);
       setModalAberta(false);
+      setForm({
+        descricao: '',
+        categoria: 'RACAO',
+        valor: 0,
+        dataDespesa: new Date().toISOString().split('T')[0],
+        tipoProducao: 'CORTE_ARROBA',
+        totalProduzidoPeriodo: 350
+      });
       carregarFinanceiro(propriedadeId, arrobasProduzidas, litrosLeiteProduzidos);
+      alert('Despesa registrada com sucesso!');
     } catch (err) {
       alert('Erro ao registrar despesa.');
     }
@@ -78,10 +91,10 @@ export const Financeiro: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
             <DollarSign className="w-7 h-7 text-agro-primary" />
-            Módulo Financeiro, Apuração de Custos & Taxa de Desfrute (RF07 / RN03)
+            Módulo Financeiro, Custos & Taxa de Desfrute
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Rateio de despesas operacionais por arroba (@) ou litro de leite e indicador de Taxa de Desfrute do Rebanho
+            Rateio de despesas operacionais por arroba (@) ou litro de leite e taxa de desfrute do rebanho
           </p>
         </div>
 
@@ -94,9 +107,13 @@ export const Financeiro: React.FC = () => {
             }}
             className="px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700"
           >
-            {propriedades.map(p => (
-              <option key={p.id} value={p.id}>{p.nomeFazenda || p.nome}</option>
-            ))}
+            {propriedades.length === 0 ? (
+              <option value="">Nenhuma fazenda cadastrada</option>
+            ) : (
+              propriedades.map(p => (
+                <option key={p.id} value={p.id}>{p.nomeFazenda || p.nome}</option>
+              ))
+            )}
           </select>
 
           <button
@@ -122,7 +139,7 @@ export const Financeiro: React.FC = () => {
 
         {/* Custo por Arroba */}
         <div className="bg-white p-5 rounded-2xl shadow-card border border-agro-border space-y-1">
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Custo por Arroba (@) (RF07)</span>
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Custo por Arroba (@)</span>
           <span className="text-2xl font-black text-agro-forest block">
             R$ {resumo?.custoPorArroba?.toFixed(2) || '0,00'} /@
           </span>
@@ -131,16 +148,16 @@ export const Financeiro: React.FC = () => {
 
         {/* Custo por Litro de Leite */}
         <div className="bg-white p-5 rounded-2xl shadow-card border border-agro-border space-y-1">
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Custo por Litro de Leite (RF07)</span>
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Custo por Litro de Leite</span>
           <span className="text-2xl font-black text-agro-primary block">
             R$ {resumo?.custoPorLitroLeite?.toFixed(2) || '0,00'} /L
           </span>
           <span className="text-[11px] text-slate-500 block">Baseado em {litrosLeiteProduzidos.toLocaleString()} L produzidos</span>
         </div>
 
-        {/* Taxa de Desfrute (RN03) */}
+        {/* Taxa de Desfrute */}
         <div className="bg-gradient-to-br from-agro-primary to-agro-dark text-white p-5 rounded-2xl shadow-card space-y-1">
-          <span className="text-xs font-bold text-agro-secondary uppercase tracking-wider block">Taxa de Desfrute (RN03)</span>
+          <span className="text-xs font-bold text-agro-secondary uppercase tracking-wider block">Taxa de Desfrute</span>
           <span className="text-3xl font-black block text-amber-300">
             {resumo?.taxaDesfrutePercentual || 0}%
           </span>
@@ -237,10 +254,26 @@ export const Financeiro: React.FC = () => {
             <h3 className="text-lg font-bold text-slate-800">Lançar Nova Despesa Operacional</h3>
             <form onSubmit={handleSubmit} className="space-y-3">
               <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Fazenda / Propriedade</label>
+                <select
+                  value={propriedadeId}
+                  onChange={e => setPropriedadeId(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 bg-slate-50"
+                >
+                  <option value="">-- Selecione a Fazenda --</option>
+                  {propriedades.map(p => (
+                    <option key={p.id} value={p.id}>{p.nomeFazenda || p.nome}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Descrição</label>
                 <input
                   type="text"
                   required
+                  placeholder="Ex: Compra de sal mineral, conserto de cerca, etc."
                   value={form.descricao}
                   onChange={e => setForm({...form, descricao: e.target.value})}
                   className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"

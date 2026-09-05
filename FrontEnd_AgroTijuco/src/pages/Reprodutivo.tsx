@@ -72,7 +72,7 @@ export const Reprodutivo: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
             <HeartPulse className="w-7 h-7 text-agro-primary" />
-            Gestão Reprodutiva (RF02)
+            Gestão Reprodutiva
           </h1>
           <p className="text-sm text-slate-500 mt-1">
             Controle de IATF, Inseminações, Toques, Partos e Alertas de Previsão de Ciclos

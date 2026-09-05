@@ -11,8 +11,8 @@ export const Pastagens: React.FC = () => {
   const [modalAberta, setModalAberta] = useState(false);
   const [form, setForm] = useState({
     nomePiquete: '',
-    areaHectares: 15,
-    capacidadeCabecas: 30,
+    areaHectares: 10,
+    capacidadeCabecas: 20,
     tipoCapim: 'Brachiaria Brizantha',
     observacao: ''
   });
@@ -24,8 +24,8 @@ export const Pastagens: React.FC = () => {
   const carregarPropriedades = async () => {
     try {
       const list = await propriedadeService.listarTodas();
-      setPropriedades(list);
-      if (list.length > 0 && list[0].id) {
+      setPropriedades(list || []);
+      if (list && list.length > 0 && list[0].id) {
         setPropriedadeId(list[0].id);
         carregarPiquetes(list[0].id);
       }
@@ -35,9 +35,10 @@ export const Pastagens: React.FC = () => {
   };
 
   const carregarPiquetes = async (pId: string) => {
+    if (!pId) return;
     try {
       const list = await pastagemService.listarPorPropriedade(pId);
-      setPiquetes(list);
+      setPiquetes(list || []);
     } catch (err) {
       console.error(err);
     }
@@ -45,11 +46,22 @@ export const Pastagens: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!propriedadeId) return alert('Selecione uma fazenda.');
+    if (!propriedadeId) {
+      alert('Selecione uma fazenda para cadastrar o piquete.');
+      return;
+    }
     try {
       await pastagemService.cadastrar(propriedadeId, form);
       setModalAberta(false);
+      setForm({
+        nomePiquete: '',
+        areaHectares: 10,
+        capacidadeCabecas: 20,
+        tipoCapim: 'Brachiaria Brizantha',
+        observacao: ''
+      });
       carregarPiquetes(propriedadeId);
+      alert('Piquete cadastrado com sucesso!');
     } catch (err) {
       alert('Erro ao cadastrar piquete.');
     }
@@ -62,10 +74,10 @@ export const Pastagens: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
             <Trees className="w-7 h-7 text-agro-primary" />
-            Gestão de Pastagens e Manejo Rotacionado (RF05)
+            Gestão de Pastagens e Piquetes
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Controle de lotação de animais por piquete, capacidade de suporte e descanso do pasto
+            Controle de lotação de animais por piquete, capacidade de suporte e manejo de pasto
           </p>
         </div>
 
@@ -78,9 +90,13 @@ export const Pastagens: React.FC = () => {
             }}
             className="px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700"
           >
-            {propriedades.map(p => (
-              <option key={p.id} value={p.id}>{p.nomeFazenda || p.nome}</option>
-            ))}
+            {propriedades.length === 0 ? (
+              <option value="">Nenhuma fazenda cadastrada</option>
+            ) : (
+              propriedades.map(p => (
+                <option key={p.id} value={p.id}>{p.nomeFazenda || p.nome}</option>
+              ))
+            )}
           </select>
 
           <button
@@ -97,7 +113,9 @@ export const Pastagens: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         {piquetes.length === 0 ? (
           <div className="col-span-full bg-white p-12 text-center rounded-2xl border border-agro-border text-slate-400 italic">
-            Nenhum piquete cadastrado nesta propriedade. Clique em "Novo Piquete" para cadastrar.
+            {propriedades.length === 0
+              ? 'Cadastre uma fazenda para gerenciar piquetes.'
+              : 'Nenhum piquete cadastrado nesta propriedade. Clique em "Novo Piquete" para cadastrar.'}
           </div>
         ) : (
           piquetes.map(p => (
@@ -121,7 +139,7 @@ export const Pastagens: React.FC = () => {
               </div>
 
               <div className="text-xs text-slate-500 flex items-center justify-between pt-1">
-                <span>Taxa Recomendada: {(p.capacidadeCabecas / p.areaHectares).toFixed(1)} UA/ha</span>
+                <span>Taxa Recomendada: {(p.capacidadeCabecas / (p.areaHectares || 1)).toFixed(1)} UA/ha</span>
                 <span className="text-emerald-700 font-semibold">Pasto em Rotação</span>
               </div>
             </div>
@@ -135,6 +153,21 @@ export const Pastagens: React.FC = () => {
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
             <h3 className="text-lg font-bold text-slate-800">Cadastrar Novo Piquete / Pasto</h3>
             <form onSubmit={handleSubmit} className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Fazenda / Propriedade</label>
+                <select
+                  value={propriedadeId}
+                  onChange={e => setPropriedadeId(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 bg-slate-50"
+                >
+                  <option value="">-- Selecione a Fazenda --</option>
+                  {propriedades.map(p => (
+                    <option key={p.id} value={p.id}>{p.nomeFazenda || p.nome}</option>
+                  ))}
+                </select>
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Nome do Piquete</label>
                 <input

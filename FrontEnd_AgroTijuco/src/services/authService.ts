@@ -42,6 +42,14 @@ export const authService = {
     return processAuthResponse(response.data, rememberMe);
   },
 
+  async cadastrarNovoUsuario(credentials: RegisterCredentials): Promise<any> {
+    const response = await api.post('/auth/register', {
+      ...credentials,
+      role: credentials.role || 'GESTOR',
+    });
+    return response.data;
+  },
+
   logout(): void {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);

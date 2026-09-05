@@ -64,7 +64,7 @@ export const Sanidade: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
             <Syringe className="w-7 h-7 text-agro-primary" />
-            Calendário Sanitário & Carência (RF03 / RN02)
+            Calendário Sanitário & Carência
           </h1>
           <p className="text-sm text-slate-500 mt-1">
             Manejos sanitários, vermifugações e bloqueio automático de venda/abate durante o período de carência
@@ -80,17 +80,17 @@ export const Sanidade: React.FC = () => {
         </button>
       </div>
 
-      {/* BANNER REGRA DE NEGÓCIO RN02 */}
+      {/* BANNER CARÊNCIA SANITÁRIA */}
       <div className="bg-red-50 border border-red-200 rounded-2xl p-5 shadow-xs flex items-start gap-4">
         <div className="p-3 bg-red-100 rounded-xl text-red-700">
           <ShieldAlert className="w-6 h-6" />
         </div>
         <div>
           <h2 className="text-base font-bold text-red-900 flex items-center gap-2">
-            Regra de Negócio Ativa: Bloqueio por Carência Sanitária (RN02)
+            Controle de Carência Sanitária
           </h2>
           <p className="text-xs text-red-800 mt-1 leading-relaxed">
-            Animais com vacinas ou medicamentos aplicados recentemente entram automaticamente em isolamento sanitário e **não podem ser alterados para o status VENDIDO ou ABATIDO** até o vencimento da data de carência.
+            Animais com vacinas ou medicamentos aplicados recentemente entram automaticamente em período de carência e ficam protegidos contra venda ou abate até o término do prazo.
           </p>
         </div>
       </div>
@@ -211,7 +211,7 @@ export const Sanidade: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Dias de Carência (RN02)</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Dias de Carência</label>
                   <input
                     type="number"
                     min="0"
