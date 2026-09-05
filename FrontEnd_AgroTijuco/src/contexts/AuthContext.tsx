@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { User, LoginCredentials } from '../types';
-import { authService } from '../services/authService';
+import { authService, type RegisterCredentials } from '../services/authService';
 import { TOKEN_KEY, USER_KEY } from '../services/api';
 
 const TECH_VIEW_KEY = '@AgroTijuco:techView';
@@ -11,7 +11,7 @@ export const MOCK_GESTOR: User = {
   email: 'thaynna.yara@agrotijuco.com.br',
   perfil: 'GESTOR',
   role: 'GESTOR',
-  tenantId: 'tenant-fazenda-agrotijuco-001',
+  tenantId: 'Fazenda AgroTijuco',
 };
 
 export const MOCK_PRODUTOR: User = {
@@ -20,7 +20,7 @@ export const MOCK_PRODUTOR: User = {
   email: 'walter.barreto@fazenda.com.br',
   perfil: 'PRODUTOR',
   role: 'PRODUTOR',
-  tenantId: 'tenant-fazenda-agrotijuco-001',
+  tenantId: 'Fazenda AgroTijuco',
   produtorId: '9b1deb4d-3b7d-4149-9cd6-890000000001',
   produtorNome: 'Walter Barreto',
 };
@@ -35,6 +35,7 @@ interface AuthContextData {
   setShowTechnicalDetails: (value: boolean) => void;
   toggleTechnicalDetails: () => void;
   login: (credentials: LoginCredentials, rememberMe?: boolean) => Promise<void>;
+  register: (credentials: RegisterCredentials, rememberMe?: boolean) => Promise<void>;
   logout: () => void;
   setMockAuth: (user: User, token: string) => void;
   switchUserRole: (role: 'GESTOR' | 'PRODUTOR') => void;
@@ -45,14 +46,15 @@ const AuthContext = createContext<AuthContextData>({} as AuthContextData);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(() => {
     const storedUser = localStorage.getItem(USER_KEY) || sessionStorage.getItem(USER_KEY);
-    if (storedUser) {
+    const storedToken = localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY);
+    if (storedUser && storedToken) {
       try {
         return JSON.parse(storedUser);
       } catch {
-        return MOCK_GESTOR;
+        return null;
       }
     }
-    return MOCK_GESTOR;
+    return null;
   });
 
   const [loading, setLoading] = useState<boolean>(false);
@@ -83,7 +85,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUser(JSON.parse(storedUser));
         } catch {
           authService.logout();
+          setUser(null);
         }
+      } else {
+        setUser(null);
       }
       setLoading(false);
     }
@@ -93,6 +98,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (credentials: LoginCredentials, rememberMe = true) => {
     const data = await authService.login(credentials, rememberMe);
+    setUser(data.usuario);
+  };
+
+  const register = async (credentials: RegisterCredentials, rememberMe = true) => {
+    const data = await authService.register(credentials, rememberMe);
     setUser(data.usuario);
   };
 
@@ -127,6 +137,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setShowTechnicalDetails,
         toggleTechnicalDetails,
         login,
+        register,
         logout,
         setMockAuth,
         switchUserRole,

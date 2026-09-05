@@ -38,27 +38,6 @@ export const Produtores: React.FC = () => {
   const [createdUuid, setCreatedUuid] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
 
-  const initialMockProdutores: Produtor[] = [
-    {
-      id: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
-      nome: 'Agropecuária Vale do Tijuco Ltda',
-      cpfCnpj: '12.345.678/0001-90',
-      email: 'contato@valetijuco.com.br',
-      telefone: '(34) 99876-5432',
-      endereco: 'Rodovia BR-365, Km 45 - Uberlândia/MG',
-      totalPropriedades: 3,
-    },
-    {
-      id: '9b1deb4d-3b7d-4149-9cd6-890000000001',
-      nome: 'Walter Barreto',
-      cpfCnpj: '123.456.789-00',
-      email: 'walter.barreto@fazenda.com.br',
-      telefone: '(34) 98811-2233',
-      endereco: 'Zona Rural - Monte Alegre de Minas/MG',
-      totalPropriedades: 1,
-    },
-  ];
-
   const {
     register,
     handleSubmit,
@@ -72,9 +51,9 @@ export const Produtores: React.FC = () => {
     setLoading(true);
     try {
       const data = await produtorService.listar();
-      setProdutores(data && data.length > 0 ? data : initialMockProdutores);
+      setProdutores(data || []);
     } catch {
-      setProdutores(initialMockProdutores);
+      setProdutores([]);
     } finally {
       setLoading(false);
     }

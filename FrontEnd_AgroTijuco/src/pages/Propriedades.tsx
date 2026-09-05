@@ -42,32 +42,6 @@ export const Propriedades: React.FC = () => {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
 
-  const mockPropriedades: Propriedade[] = [
-    {
-      id: 'prop-uuid-0001-tijuco',
-      nome: 'Fazenda Santa Luzia',
-      inscricaoEstadual: '001.234.567-89',
-      areaHectares: 1250.5,
-      produtorId: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
-      produtorNome: 'Agropecuária Vale do Tijuco Ltda',
-      localizacao: 'BR-365, Km 45 - Uberlândia/MG',
-    },
-    {
-      id: 'prop-uuid-0002-tijuco',
-      nome: 'Sítio Boa Esperança',
-      inscricaoEstadual: '987.654.321-00',
-      areaHectares: 340.0,
-      produtorId: '9b1deb4d-3b7d-4149-9cd6-890000000001',
-      produtorNome: 'Walter Barreto',
-      localizacao: 'Monte Alegre de Minas/MG',
-    },
-  ];
-
-  const mockProdutores: Produtor[] = [
-    { id: 'f47ac10b-58cc-4372-a567-0e02b2c3d479', nome: 'Agropecuária Vale do Tijuco Ltda', cpfCnpj: '12.345.678/0001-90', email: '', telefone: '' },
-    { id: '9b1deb4d-3b7d-4149-9cd6-890000000001', nome: 'Walter Barreto', cpfCnpj: '123.456.789-00', email: '', telefone: '' },
-  ];
-
   const {
     register,
     handleSubmit,
@@ -81,14 +55,14 @@ export const Propriedades: React.FC = () => {
     setLoading(true);
     try {
       const [propsData, prodsData] = await Promise.all([
-        propriedadeService.listarTodas().catch(() => mockPropriedades),
-        produtorService.listar().catch(() => mockProdutores),
+        propriedadeService.listarTodas().catch(() => []),
+        produtorService.listar().catch(() => []),
       ]);
-      setPropriedades(propsData.length > 0 ? propsData : mockPropriedades);
-      setProdutores(prodsData.length > 0 ? prodsData : mockProdutores);
+      setPropriedades(propsData || []);
+      setProdutores(prodsData || []);
     } catch {
-      setPropriedades(mockPropriedades);
-      setProdutores(mockProdutores);
+      setPropriedades([]);
+      setProdutores([]);
     } finally {
       setLoading(false);
     }

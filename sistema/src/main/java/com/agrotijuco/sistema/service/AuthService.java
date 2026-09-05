@@ -34,7 +34,7 @@ public class AuthService {
         usuario.setEmail(dto.getEmail());
         usuario.setSenha(passwordEncoder.encode(dto.getSenha()));
         usuario.setTenantId(dto.getTenantId());
-        usuario.setRole(dto.getRole());
+        usuario.setRole(dto.getRole() != null ? dto.getRole() : com.agrotijuco.sistema.model.Role.GESTOR);
         usuario.setAtivo(true);
 
         usuarioRepository.save(usuario);

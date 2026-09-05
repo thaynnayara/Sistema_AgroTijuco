@@ -1,16 +1,45 @@
 import { api, TOKEN_KEY, USER_KEY } from './api';
-import type { LoginCredentials, AuthResponse } from '../types';
+import type { LoginCredentials, AuthResponse, User } from '../types';
+
+export interface RegisterCredentials {
+  nome: string;
+  email: string;
+  senha: string;
+  tenantId: string;
+  role?: 'GESTOR' | 'ADMIN' | 'PRODUTOR' | 'OPERADOR';
+}
+
+function processAuthResponse(data: any, rememberMe: boolean): AuthResponse {
+  const token = data.token;
+  const user: User = data.usuario || {
+    id: data.email,
+    nome: data.nome || data.email,
+    email: data.email,
+    perfil: data.role || 'GESTOR',
+    role: data.role || 'GESTOR',
+    tenantId: data.tenantId || 'Fazenda AgroTijuco',
+    produtorId: data.produtorId,
+  };
+
+  const storage = rememberMe ? localStorage : sessionStorage;
+  storage.setItem(TOKEN_KEY, token);
+  storage.setItem(USER_KEY, JSON.stringify(user));
+
+  return { token, usuario: user };
+}
 
 export const authService = {
   async login(credentials: LoginCredentials, rememberMe: boolean = true): Promise<AuthResponse> {
-    const response = await api.post<AuthResponse>('/auth/login', credentials);
-    const { token, usuario } = response.data;
+    const response = await api.post('/auth/login', credentials);
+    return processAuthResponse(response.data, rememberMe);
+  },
 
-    const storage = rememberMe ? localStorage : sessionStorage;
-    storage.setItem(TOKEN_KEY, token);
-    storage.setItem(USER_KEY, JSON.stringify(usuario));
-
-    return response.data;
+  async register(credentials: RegisterCredentials, rememberMe: boolean = true): Promise<AuthResponse> {
+    const response = await api.post('/auth/register', {
+      ...credentials,
+      role: credentials.role || 'GESTOR',
+    });
+    return processAuthResponse(response.data, rememberMe);
   },
 
   logout(): void {
@@ -20,3 +49,4 @@ export const authService = {
     sessionStorage.removeItem(USER_KEY);
   }
 };
+
