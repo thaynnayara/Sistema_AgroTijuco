@@ -7,6 +7,11 @@ export const propriedadeService = {
     return response.data;
   },
 
+  async atribuirProdutor(propriedadeId: string, produtorUuid: string): Promise<Propriedade> {
+    const response = await api.put<Propriedade>(`/propriedades/${propriedadeId}/atribuir-produtor/${produtorUuid}`);
+    return response.data;
+  },
+
   async listarPorProdutor(produtorUuid: string): Promise<Propriedade[]> {
     const response = await api.get<Propriedade[]>(`/propriedades/produtor/${produtorUuid}`);
     return response.data;

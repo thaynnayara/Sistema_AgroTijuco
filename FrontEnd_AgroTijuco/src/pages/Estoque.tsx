@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Boxes, Plus, ShieldAlert } from 'lucide-react';
-import type { ItemEstoque, Propriedade } from '../types';
+import type { ItemEstoque } from '../types';
 import { estoqueService } from '../services/estoqueService';
-import { propriedadeService } from '../services/propriedadeService';
+import { useFarm } from '../contexts/FarmContext';
 
 export const Estoque: React.FC = () => {
+  const { selectedFarm, propriedades, selectFarmById } = useFarm();
   const [itens, setItens] = useState<ItemEstoque[]>([]);
-  const [propriedades, setPropriedades] = useState<Propriedade[]>([]);
   const [propriedadeId, setPropriedadeId] = useState<string>('');
   const [modalCadastro, setModalCadastro] = useState(false);
   const [modalMovimento, setModalMovimento] = useState<{ aberta: boolean; item?: ItemEstoque; entrada: boolean }>({ aberta: false, entrada: true });
@@ -20,41 +20,39 @@ export const Estoque: React.FC = () => {
     unidadeMedida: 'KG' as ItemEstoque['unidadeMedida']
   });
 
-  useEffect(() => {
-    carregarPropriedades();
-  }, []);
-
-  const carregarPropriedades = async () => {
-    try {
-      const list = await propriedadeService.listarTodas();
-      setPropriedades(list || []);
-      if (list && list.length > 0 && list[0].id) {
-        setPropriedadeId(list[0].id);
-        carregarEstoque(list[0].id);
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
   const carregarEstoque = async (pId: string) => {
-    if (!pId) return;
+    if (!pId) {
+      setItens([]);
+      return;
+    }
     try {
       const list = await estoqueService.listarPorPropriedade(pId);
       setItens(list || []);
     } catch (err) {
       console.error(err);
+      setItens([]);
     }
   };
 
+  useEffect(() => {
+    const activeId = selectedFarm?.id || (propriedades.length > 0 ? propriedades[0].id : '');
+    if (activeId) {
+      setPropriedadeId(activeId);
+      carregarEstoque(activeId);
+    } else {
+      setItens([]);
+    }
+  }, [selectedFarm, propriedades]);
+
   const handleCadastro = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!propriedadeId) {
+    const activeId = selectedFarm?.id || propriedadeId;
+    if (!activeId) {
       alert('Selecione uma fazenda para vincular o insumo.');
       return;
     }
     try {
-      await estoqueService.cadastrar(propriedadeId, form);
+      await estoqueService.cadastrar(activeId, form);
       setModalCadastro(false);
       setForm({
         nomeItem: '',
@@ -63,7 +61,7 @@ export const Estoque: React.FC = () => {
         quantidadeMinima: 10,
         unidadeMedida: 'KG'
       });
-      carregarEstoque(propriedadeId);
+      carregarEstoque(activeId);
       alert('Insumo cadastrado com sucesso!');
     } catch (err) {
       alert('Erro ao cadastrar item de estoque.');
@@ -72,10 +70,11 @@ export const Estoque: React.FC = () => {
 
   const handleMovimentoSubmit = async () => {
     if (!modalMovimento.item?.id) return;
+    const activeId = selectedFarm?.id || propriedadeId;
     try {
       await estoqueService.movimentar(modalMovimento.item.id, qtdMovimento, modalMovimento.entrada);
       setModalMovimento({ aberta: false, entrada: true });
-      carregarEstoque(propriedadeId);
+      carregarEstoque(activeId);
     } catch (err: any) {
       alert(err.response?.data?.message || 'Erro na movimentação de estoque.');
     }
@@ -99,12 +98,12 @@ export const Estoque: React.FC = () => {
 
         <div className="flex items-center gap-3">
           <select
-            value={propriedadeId}
+            value={selectedFarm?.id || propriedadeId}
             onChange={e => {
               setPropriedadeId(e.target.value);
-              carregarEstoque(e.target.value);
+              selectFarmById(e.target.value);
             }}
-            className="px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700"
+            className="px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 cursor-pointer"
           >
             {propriedades.length === 0 ? (
               <option value="">Nenhuma fazenda cadastrada</option>

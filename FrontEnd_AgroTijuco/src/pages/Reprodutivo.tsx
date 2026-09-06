@@ -3,8 +3,10 @@ import { HeartPulse, Plus, Sparkles, Filter } from 'lucide-react';
 import type { EventoReprodutivo, Animal } from '../types';
 import { reprodutivoService } from '../services/reprodutivoService';
 import { animalService } from '../services/animalService';
+import { useFarm } from '../contexts/FarmContext';
 
 export const Reprodutivo: React.FC = () => {
+  const { selectedFarm } = useFarm();
   const [alertas, setAlertas] = useState<EventoReprodutivo[]>([]);
   const [animais, setAnimais] = useState<Animal[]>([]);
   const [animalSelecionado, setAnimalSelecionado] = useState<string>('');
@@ -18,34 +20,41 @@ export const Reprodutivo: React.FC = () => {
     observacao: ''
   });
 
-  useEffect(() => {
-    carregarDados();
-  }, []);
-
-  const carregarDados = async () => {
+  const carregarDados = async (farmId?: string) => {
     try {
+      const activeId = farmId || selectedFarm?.id;
       const [listAnimais, listAlertas] = await Promise.all([
-        animalService.listarTodos(),
+        animalService.listarTodos(activeId || undefined),
         reprodutivoService.listarAlertas()
       ]);
-      const femeas = listAnimais.filter(a => a.sexo === 'F' || a.sexo === 'FEMEA');
+      const femeas = (listAnimais || []).filter(a => a.sexo === 'F' || a.sexo === 'FEMEA');
       setAnimais(femeas);
-      setAlertas(listAlertas);
+      setAlertas(listAlertas || []);
       if (femeas.length > 0 && femeas[0].id) {
         setAnimalSelecionado(femeas[0].id);
         carregarEventosAnimal(femeas[0].id);
+      } else {
+        setAnimalSelecionado('');
+        setEventosAnimal([]);
       }
     } catch (err) {
       console.error(err);
+      setAnimais([]);
+      setAlertas([]);
     }
   };
+
+  useEffect(() => {
+    carregarDados(selectedFarm?.id);
+  }, [selectedFarm]);
 
   const carregarEventosAnimal = async (id: string) => {
     try {
       const data = await reprodutivoService.listarPorAnimal(id);
-      setEventosAnimal(data);
+      setEventosAnimal(data || []);
     } catch (err) {
       console.error(err);
+      setEventosAnimal([]);
     }
   };
 
@@ -59,7 +68,7 @@ export const Reprodutivo: React.FC = () => {
         observacao: form.observacao
       });
       setModalAberta(false);
-      carregarDados();
+      carregarDados(selectedFarm?.id);
     } catch (err) {
       alert('Erro ao registrar evento reprodutivo.');
     }

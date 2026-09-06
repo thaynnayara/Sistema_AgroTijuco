@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { pesagemService } from '../services/pesagemService';
 import { animalService } from '../services/animalService';
+import { useFarm } from '../contexts/FarmContext';
 import type { Pesagem, Animal } from '../types';
 import { 
   Scale, 
@@ -13,6 +14,7 @@ import {
 } from 'lucide-react';
 
 export const Pesagens: React.FC = () => {
+  const { selectedFarm } = useFarm();
   const [pesagens, setPesagens] = useState<Pesagem[]>([]);
   const [animais, setAnimais] = useState<Animal[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -26,28 +28,43 @@ export const Pesagens: React.FC = () => {
     observacao: ''
   });
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
+  const loadData = async (farmId?: string) => {
     setLoading(true);
     try {
+      const activeId = farmId || selectedFarm?.id;
       const [pesagensData, animaisData] = await Promise.all([
         pesagemService.listarTodas(),
-        animalService.listarTodos()
+        animalService.listarTodos(activeId || undefined)
       ]);
-      setPesagens(pesagensData);
-      setAnimais(animaisData);
-      if (animaisData.length > 0 && animaisData[0].id) {
+
+      setAnimais(animaisData || []);
+
+      // Se há fazenda selecionada, filtra pesagens dos animais daquela fazenda
+      if (activeId && animaisData && animaisData.length > 0) {
+        const animalIds = new Set(animaisData.map(a => a.id));
+        const filteredPesagens = pesagensData.filter(p => animalIds.has(p.animalId));
+        setPesagens(filteredPesagens);
+      } else if (activeId && (!animaisData || animaisData.length === 0)) {
+        setPesagens([]);
+      } else {
+        setPesagens(pesagensData || []);
+      }
+
+      if (animaisData && animaisData.length > 0 && animaisData[0].id) {
         setForm(f => ({ ...f, animalId: animaisData[0].id! }));
       }
     } catch (err) {
       console.error(err);
+      setPesagens([]);
+      setAnimais([]);
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadData(selectedFarm?.id);
+  }, [selectedFarm]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,7 +76,7 @@ export const Pesagens: React.FC = () => {
         observacao: form.observacao
       }, form.animalId);
       setModalOpen(false);
-      loadData();
+      loadData(selectedFarm?.id);
       alert('Pesagem registrada com sucesso!');
     } catch (err: any) {
       alert(err.response?.data?.message || 'Erro ao registrar pesagem.');

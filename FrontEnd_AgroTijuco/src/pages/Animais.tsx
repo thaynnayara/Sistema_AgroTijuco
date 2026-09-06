@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { animalService } from '../services/animalService';
-import { propriedadeService } from '../services/propriedadeService';
-import type { Animal, Propriedade, BatchAnimalInput } from '../types';
+import { useFarm } from '../contexts/FarmContext';
+import type { Animal, BatchAnimalInput } from '../types';
 import { 
   Beef, 
   Plus, 
@@ -14,8 +14,8 @@ import {
 } from 'lucide-react';
 
 export const Animais: React.FC = () => {
+  const { selectedFarm, propriedades, selectFarmById } = useFarm();
   const [animais, setAnimais] = useState<Animal[]>([]);
-  const [propriedades, setPropriedades] = useState<Propriedade[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [modalIndividual, setModalIndividual] = useState<boolean>(false);
   const [modalLote, setModalLote] = useState<boolean>(false);
@@ -41,36 +41,40 @@ export const Animais: React.FC = () => {
     dataNascimento: new Date().toISOString().split('T')[0]
   });
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
+  const loadData = async (farmId?: string) => {
     setLoading(true);
     try {
-      const [animaisData, propsData] = await Promise.all([
-        animalService.listarTodos(),
-        propriedadeService.listarTodas()
-      ]);
-      setAnimais(animaisData);
-      setPropriedades(propsData);
-      if (propsData.length > 0 && propsData[0].id) {
-        setSelectedPropId(propsData[0].id);
-      }
+      const activeId = farmId || selectedFarm?.id || selectedPropId;
+      const animaisData = await animalService.listarTodos(activeId || undefined);
+      setAnimais(animaisData || []);
     } catch (err) {
       console.error(err);
+      setAnimais([]);
     } finally {
       setLoading(false);
     }
   };
 
+  useEffect(() => {
+    if (selectedFarm?.id) {
+      setSelectedPropId(selectedFarm.id);
+      loadData(selectedFarm.id);
+    } else if (propriedades.length > 0 && propriedades[0].id) {
+      setSelectedPropId(propriedades[0].id);
+      loadData(propriedades[0].id);
+    } else {
+      loadData();
+    }
+  }, [selectedFarm, propriedades]);
+
   const handleCadastroIndividual = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedPropId) return alert('Selecione uma fazenda.');
+    const targetPropId = selectedFarm?.id || selectedPropId;
+    if (!targetPropId) return alert('Selecione uma fazenda.');
     try {
-      await animalService.cadastrar(formIndividual, selectedPropId);
+      await animalService.cadastrar(formIndividual, targetPropId);
       setModalIndividual(false);
-      loadData();
+      loadData(targetPropId);
       alert('Animal cadastrado com sucesso!');
     } catch (err: any) {
       alert(err.response?.data?.message || 'Erro ao cadastrar animal.');
@@ -79,11 +83,12 @@ export const Animais: React.FC = () => {
 
   const handleCadastroLote = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedPropId) return alert('Selecione uma fazenda.');
+    const targetPropId = selectedFarm?.id || selectedPropId;
+    if (!targetPropId) return alert('Selecione uma fazenda.');
     try {
-      const novoseAnimais = await animalService.cadastrarEmLote(formLote, selectedPropId);
+      const novoseAnimais = await animalService.cadastrarEmLote(formLote, targetPropId);
       setModalLote(false);
-      loadData();
+      loadData(targetPropId);
       alert(`Lote de ${novoseAnimais.length} animais cadastrado com sucesso!`);
     } catch (err: any) {
       alert(err.response?.data?.message || 'Erro no cadastro em lote.');
@@ -92,9 +97,10 @@ export const Animais: React.FC = () => {
 
   const handleMudarStatus = async (animal: Animal, novoStatus: Animal['status']) => {
     if (!animal.id) return;
+    const targetPropId = selectedFarm?.id || selectedPropId;
     try {
       await animalService.atualizarStatus(animal.id, novoStatus);
-      loadData();
+      loadData(targetPropId);
       alert(`Status do animal ${animal.brinco} alterado para ${novoStatus}!`);
     } catch (err: any) {
       alert(err.response?.data?.message || `Bloqueio Sanitário: Não foi possível alterar o status do animal ${animal.brinco} pois está em período de carência.`);
@@ -156,9 +162,12 @@ export const Animais: React.FC = () => {
         </div>
 
         <select
-          value={selectedPropId}
-          onChange={e => setSelectedPropId(e.target.value)}
-          className="px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700"
+          value={selectedFarm?.id || selectedPropId}
+          onChange={e => {
+            setSelectedPropId(e.target.value);
+            selectFarmById(e.target.value);
+          }}
+          className="px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 cursor-pointer"
         >
           {propriedades.map(p => (
             <option key={p.id} value={p.id}>{p.nomeFazenda || p.nome}</option>

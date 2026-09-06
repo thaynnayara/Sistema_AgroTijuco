@@ -30,13 +30,29 @@ public class PropriedadeService {
 
     @Transactional
     public Propriedade cadastrar(Propriedade propriedade, UUID produtorId) {
-        //Regra 1: O Produtor precisa existir no banco (atribuído pela gestora)
+        // Regra 1: O Produtor precisa existir no banco (atribuído pela gestora)
         Produtor produtor = produtorRepository.findById(produtorId)
                 .orElseThrow(() -> new RuntimeException("Não é possível cadastrar a propriedade. Produtor não encontrado."));
 
-        //Regra 2: Validar dados básicos
-        if (propriedade.getAreaHectares() != null && propriedade.getAreaHectares() <= 0) {
-            throw new IllegalArgumentException("A área em hectares deve ser maior que zero.");
+        // Normalização de campos para não violar restrições NOT NULL
+        if (propriedade.getNomeFazenda() == null || propriedade.getNomeFazenda().isBlank()) {
+            if (propriedade.getNome() != null && !propriedade.getNome().isBlank()) {
+                propriedade.setNomeFazenda(propriedade.getNome());
+            } else {
+                propriedade.setNomeFazenda("Fazenda sem nome");
+            }
+        }
+
+        if (propriedade.getMunicipio() == null || propriedade.getMunicipio().isBlank()) {
+            if (propriedade.getLocalizacao() != null && !propriedade.getLocalizacao().isBlank()) {
+                propriedade.setMunicipio(propriedade.getLocalizacao());
+            } else {
+                propriedade.setMunicipio("Localização não informada");
+            }
+        }
+
+        if (propriedade.getAreaHectares() == null || propriedade.getAreaHectares() <= 0) {
+            propriedade.setAreaHectares(10.0);
         }
 
         propriedade.setProdutor(produtor);
@@ -65,13 +81,24 @@ public class PropriedadeService {
         Propriedade propriedade = buscarPorId(id);
         if (dadosAtualizados.getNomeFazenda() != null && !dadosAtualizados.getNomeFazenda().isBlank()) {
             propriedade.setNomeFazenda(dadosAtualizados.getNomeFazenda());
+        } else if (dadosAtualizados.getNome() != null && !dadosAtualizados.getNome().isBlank()) {
+            propriedade.setNomeFazenda(dadosAtualizados.getNome());
         }
+
         if (dadosAtualizados.getMunicipio() != null && !dadosAtualizados.getMunicipio().isBlank()) {
             propriedade.setMunicipio(dadosAtualizados.getMunicipio());
+        } else if (dadosAtualizados.getLocalizacao() != null && !dadosAtualizados.getLocalizacao().isBlank()) {
+            propriedade.setMunicipio(dadosAtualizados.getLocalizacao());
         }
+
         if (dadosAtualizados.getAreaHectares() != null && dadosAtualizados.getAreaHectares() > 0) {
             propriedade.setAreaHectares(dadosAtualizados.getAreaHectares());
         }
+
+        if (dadosAtualizados.getInscricaoEstadual() != null) {
+            propriedade.setInscricaoEstadual(dadosAtualizados.getInscricaoEstadual());
+        }
+
         return propriedadeRepository.save(propriedade);
     }
 

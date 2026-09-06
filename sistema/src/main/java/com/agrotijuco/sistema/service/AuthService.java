@@ -16,11 +16,16 @@ import org.springframework.transaction.annotation.Transactional;
 public class AuthService {
 
     private final UsuarioRepository usuarioRepository;
+    private final com.agrotijuco.sistema.repository.ProdutorRepository produtorRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenService jwtTokenService;
 
-    public AuthService(UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder, JwtTokenService jwtTokenService) {
+    public AuthService(UsuarioRepository usuarioRepository,
+                       com.agrotijuco.sistema.repository.ProdutorRepository produtorRepository,
+                       PasswordEncoder passwordEncoder,
+                       JwtTokenService jwtTokenService) {
         this.usuarioRepository = usuarioRepository;
+        this.produtorRepository = produtorRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtTokenService = jwtTokenService;
     }
@@ -42,6 +47,18 @@ public class AuthService {
             usuario.setTenantId(dto.getTenantId());
             usuario.setRole(dto.getRole() != null ? dto.getRole() : com.agrotijuco.sistema.model.Role.PRODUTOR);
             usuario.setAtivo(true);
+
+            if (usuario.getRole() == com.agrotijuco.sistema.model.Role.PRODUTOR) {
+                com.agrotijuco.sistema.model.Produtor produtor = new com.agrotijuco.sistema.model.Produtor(
+                        usuario.getNome(),
+                        "CPF-" + java.util.UUID.randomUUID().toString().substring(0, 8),
+                        usuario.getEmail(),
+                        ""
+                );
+                produtor.setTenantId(dto.getTenantId());
+                produtor = produtorRepository.save(produtor);
+                usuario.setProdutorId(produtor.getId());
+            }
 
             usuarioRepository.save(usuario);
         } finally {

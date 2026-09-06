@@ -3,8 +3,10 @@ import { Syringe, AlertTriangle, ShieldAlert, Plus } from 'lucide-react';
 import type { RegistroSanitario, Animal } from '../types';
 import { sanitarioService } from '../services/sanitarioService';
 import { animalService } from '../services/animalService';
+import { useFarm } from '../contexts/FarmContext';
 
 export const Sanidade: React.FC = () => {
+  const { selectedFarm } = useFarm();
   const [carencias, setCarencias] = useState<RegistroSanitario[]>([]);
   const [animais, setAnimais] = useState<Animal[]>([]);
   const [modalAberta, setModalAberta] = useState(false);
@@ -19,22 +21,33 @@ export const Sanidade: React.FC = () => {
     observacao: ''
   });
 
-  useEffect(() => {
-    carregarDados();
-  }, []);
-
-  const carregarDados = async () => {
+  const carregarDados = async (farmId?: string) => {
     try {
+      const activeId = farmId || selectedFarm?.id;
       const [listCarencias, listAnimais] = await Promise.all([
         sanitarioService.listarCarenciasAtivas(),
-        animalService.listarTodos()
+        animalService.listarTodos(activeId || undefined)
       ]);
-      setCarencias(listCarencias);
-      setAnimais(listAnimais);
+
+      setAnimais(listAnimais || []);
+
+      if (activeId && listAnimais && listAnimais.length > 0) {
+        const animalIds = new Set(listAnimais.map(a => a.id));
+        const filteredCarencias = (listCarencias || []).filter(c => !c.animalId || animalIds.has(c.animalId));
+        setCarencias(filteredCarencias);
+      } else {
+        setCarencias(listCarencias || []);
+      }
     } catch (err) {
       console.error(err);
+      setCarencias([]);
+      setAnimais([]);
     }
   };
+
+  useEffect(() => {
+    carregarDados(selectedFarm?.id);
+  }, [selectedFarm]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,7 +63,7 @@ export const Sanidade: React.FC = () => {
         observacao: form.observacao
       });
       setModalAberta(false);
-      carregarDados();
+      carregarDados(selectedFarm?.id);
       alert('Aplicação sanitária registrada com sucesso!');
     } catch (err) {
       alert('Erro ao registrar vacina/medicamento.');

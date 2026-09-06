@@ -1,5 +1,7 @@
 package com.agrotijuco.sistema.model;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
@@ -11,11 +13,13 @@ public class Produtor extends Auditable {
     @Column(nullable = false, length = 100)
     private String nome;
 
-    @Column(nullable = false, length = 14)
+    @Column(nullable = false, length = 30)
+    @JsonAlias({"cpfCnpj", "cpfOuCnpj"})
     private String cpfOuCnpj;
 
     private String email;
     private String telefone;
+    private String endereco;
 
     public Produtor() {}
 
@@ -42,6 +46,16 @@ public class Produtor extends Auditable {
         this.cpfOuCnpj = cpfOuCnpj;
     }
 
+    @JsonProperty("cpfCnpj")
+    public String getCpfCnpj() {
+        return cpfOuCnpj;
+    }
+
+    @JsonProperty("cpfCnpj")
+    public void setCpfCnpj(String cpfCnpj) {
+        this.cpfOuCnpj = cpfCnpj;
+    }
+
     public String getEmail() {
         return email;
     }
@@ -56,5 +70,13 @@ public class Produtor extends Auditable {
 
     public void setTelefone(String telefone) {
         this.telefone = telefone;
+    }
+
+    public String getEndereco() {
+        return endereco;
+    }
+
+    public void setEndereco(String endereco) {
+        this.endereco = endereco;
     }
 }

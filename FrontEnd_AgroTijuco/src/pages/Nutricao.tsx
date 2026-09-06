@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Apple, Plus, Utensils } from 'lucide-react';
-import type { DietaTrato, Propriedade } from '../types';
+import type { DietaTrato } from '../types';
 import { nutricaoService } from '../services/nutricaoService';
-import { propriedadeService } from '../services/propriedadeService';
+import { useFarm } from '../contexts/FarmContext';
 
 export const Nutricao: React.FC = () => {
+  const { selectedFarm, propriedades, selectFarmById } = useFarm();
   const [dietas, setDietas] = useState<DietaTrato[]>([]);
-  const [propriedades, setPropriedades] = useState<Propriedade[]>([]);
   const [propriedadeId, setPropriedadeId] = useState<string>('');
   const [modalAberta, setModalAberta] = useState(false);
 
@@ -19,41 +19,39 @@ export const Nutricao: React.FC = () => {
     observacoes: ''
   });
 
-  useEffect(() => {
-    carregarPropriedades();
-  }, []);
-
-  const carregarPropriedades = async () => {
-    try {
-      const list = await propriedadeService.listarTodas();
-      setPropriedades(list || []);
-      if (list && list.length > 0 && list[0].id) {
-        setPropriedadeId(list[0].id);
-        carregarDietas(list[0].id);
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
   const carregarDietas = async (pId: string) => {
-    if (!pId) return;
+    if (!pId) {
+      setDietas([]);
+      return;
+    }
     try {
       const list = await nutricaoService.listarPorPropriedade(pId);
       setDietas(list || []);
     } catch (err) {
       console.error(err);
+      setDietas([]);
     }
   };
 
+  useEffect(() => {
+    const activeId = selectedFarm?.id || (propriedades.length > 0 ? propriedades[0].id : '');
+    if (activeId) {
+      setPropriedadeId(activeId);
+      carregarDietas(activeId);
+    } else {
+      setDietas([]);
+    }
+  }, [selectedFarm, propriedades]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!propriedadeId) {
+    const activeId = selectedFarm?.id || propriedadeId;
+    if (!activeId) {
       alert('Selecione uma fazenda para registrar a dieta.');
       return;
     }
     try {
-      await nutricaoService.registrar(propriedadeId, form);
+      await nutricaoService.registrar(activeId, form);
       setModalAberta(false);
       setForm({
         nomeDieta: '',
@@ -63,7 +61,7 @@ export const Nutricao: React.FC = () => {
         dataTrato: new Date().toISOString().split('T')[0],
         observacoes: ''
       });
-      carregarDietas(propriedadeId);
+      carregarDietas(activeId);
       alert('Dieta registrada com sucesso!');
     } catch (err) {
       alert('Erro ao registrar dieta.');
@@ -86,12 +84,12 @@ export const Nutricao: React.FC = () => {
 
         <div className="flex items-center gap-3">
           <select
-            value={propriedadeId}
+            value={selectedFarm?.id || propriedadeId}
             onChange={e => {
               setPropriedadeId(e.target.value);
-              carregarDietas(e.target.value);
+              selectFarmById(e.target.value);
             }}
-            className="px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700"
+            className="px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 cursor-pointer"
           >
             {propriedades.length === 0 ? (
               <option value="">Nenhuma fazenda cadastrada</option>

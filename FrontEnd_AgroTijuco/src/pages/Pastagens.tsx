@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Trees, Plus } from 'lucide-react';
-import type { Piquete, Propriedade } from '../types';
+import type { Piquete } from '../types';
 import { pastagemService } from '../services/pastagemService';
-import { propriedadeService } from '../services/propriedadeService';
+import { useFarm } from '../contexts/FarmContext';
 
 export const Pastagens: React.FC = () => {
+  const { selectedFarm, propriedades, selectFarmById } = useFarm();
   const [piquetes, setPiquetes] = useState<Piquete[]>([]);
-  const [propriedades, setPropriedades] = useState<Propriedade[]>([]);
   const [propriedadeId, setPropriedadeId] = useState<string>('');
   const [modalAberta, setModalAberta] = useState(false);
   const [form, setForm] = useState({
@@ -17,41 +17,39 @@ export const Pastagens: React.FC = () => {
     observacao: ''
   });
 
-  useEffect(() => {
-    carregarPropriedades();
-  }, []);
-
-  const carregarPropriedades = async () => {
-    try {
-      const list = await propriedadeService.listarTodas();
-      setPropriedades(list || []);
-      if (list && list.length > 0 && list[0].id) {
-        setPropriedadeId(list[0].id);
-        carregarPiquetes(list[0].id);
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
   const carregarPiquetes = async (pId: string) => {
-    if (!pId) return;
+    if (!pId) {
+      setPiquetes([]);
+      return;
+    }
     try {
       const list = await pastagemService.listarPorPropriedade(pId);
       setPiquetes(list || []);
     } catch (err) {
       console.error(err);
+      setPiquetes([]);
     }
   };
 
+  useEffect(() => {
+    const activeId = selectedFarm?.id || (propriedades.length > 0 ? propriedades[0].id : '');
+    if (activeId) {
+      setPropriedadeId(activeId);
+      carregarPiquetes(activeId);
+    } else {
+      setPiquetes([]);
+    }
+  }, [selectedFarm, propriedades]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!propriedadeId) {
+    const activeId = selectedFarm?.id || propriedadeId;
+    if (!activeId) {
       alert('Selecione uma fazenda para cadastrar o piquete.');
       return;
     }
     try {
-      await pastagemService.cadastrar(propriedadeId, form);
+      await pastagemService.cadastrar(activeId, form);
       setModalAberta(false);
       setForm({
         nomePiquete: '',
@@ -60,7 +58,7 @@ export const Pastagens: React.FC = () => {
         tipoCapim: 'Brachiaria Brizantha',
         observacao: ''
       });
-      carregarPiquetes(propriedadeId);
+      carregarPiquetes(activeId);
       alert('Piquete cadastrado com sucesso!');
     } catch (err) {
       alert('Erro ao cadastrar piquete.');
@@ -83,12 +81,12 @@ export const Pastagens: React.FC = () => {
 
         <div className="flex items-center gap-3">
           <select
-            value={propriedadeId}
+            value={selectedFarm?.id || propriedadeId}
             onChange={e => {
               setPropriedadeId(e.target.value);
-              carregarPiquetes(e.target.value);
+              selectFarmById(e.target.value);
             }}
-            className="px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700"
+            className="px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 cursor-pointer"
           >
             {propriedades.length === 0 ? (
               <option value="">Nenhuma fazenda cadastrada</option>

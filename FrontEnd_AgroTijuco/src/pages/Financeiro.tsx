@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { DollarSign, Plus, Calculator } from 'lucide-react';
-import type { DespesaOperacional, Propriedade, ResumoApuracaoCustos } from '../types';
+import type { DespesaOperacional, ResumoApuracaoCustos } from '../types';
 import { financeiroService } from '../services/financeiroService';
-import { propriedadeService } from '../services/propriedadeService';
+import { useFarm } from '../contexts/FarmContext';
 
 export const Financeiro: React.FC = () => {
+  const { selectedFarm, propriedades, selectFarmById } = useFarm();
   const [despesas, setDespesas] = useState<DespesaOperacional[]>([]);
   const [resumo, setResumo] = useState<ResumoApuracaoCustos | null>(null);
-  const [propriedades, setPropriedades] = useState<Propriedade[]>([]);
   const [propriedadeId, setPropriedadeId] = useState<string>('');
   
   const [arrobasProduzidas, setArrobasProduzidas] = useState<number>(350);
@@ -23,25 +23,12 @@ export const Financeiro: React.FC = () => {
     totalProduzidoPeriodo: 350
   });
 
-  useEffect(() => {
-    carregarPropriedades();
-  }, []);
-
-  const carregarPropriedades = async () => {
-    try {
-      const list = await propriedadeService.listarTodas();
-      setPropriedades(list || []);
-      if (list && list.length > 0 && list[0].id) {
-        setPropriedadeId(list[0].id);
-        carregarFinanceiro(list[0].id, arrobasProduzidas, litrosLeiteProduzidos);
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
   const carregarFinanceiro = async (pId: string, arrobas: number, litros: number) => {
-    if (!pId) return;
+    if (!pId) {
+      setDespesas([]);
+      setResumo(null);
+      return;
+    }
     try {
       const [listDespesas, apuracao] = await Promise.all([
         financeiroService.listarDespesas(pId),
@@ -51,23 +38,38 @@ export const Financeiro: React.FC = () => {
       setResumo(apuracao);
     } catch (err) {
       console.error(err);
+      setDespesas([]);
+      setResumo(null);
     }
   };
 
+  useEffect(() => {
+    const activeId = selectedFarm?.id || (propriedades.length > 0 ? propriedades[0].id : '');
+    if (activeId) {
+      setPropriedadeId(activeId);
+      carregarFinanceiro(activeId, arrobasProduzidas, litrosLeiteProduzidos);
+    } else {
+      setDespesas([]);
+      setResumo(null);
+    }
+  }, [selectedFarm, propriedades]);
+
   const handleRecalcular = () => {
-    if (propriedadeId) {
-      carregarFinanceiro(propriedadeId, arrobasProduzidas, litrosLeiteProduzidos);
+    const activeId = selectedFarm?.id || propriedadeId;
+    if (activeId) {
+      carregarFinanceiro(activeId, arrobasProduzidas, litrosLeiteProduzidos);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!propriedadeId) {
+    const activeId = selectedFarm?.id || propriedadeId;
+    if (!activeId) {
       alert('Selecione uma fazenda para lançar a despesa.');
       return;
     }
     try {
-      await financeiroService.registrarDespesa(propriedadeId, form);
+      await financeiroService.registrarDespesa(activeId, form);
       setModalAberta(false);
       setForm({
         descricao: '',
@@ -77,7 +79,7 @@ export const Financeiro: React.FC = () => {
         tipoProducao: 'CORTE_ARROBA',
         totalProduzidoPeriodo: 350
       });
-      carregarFinanceiro(propriedadeId, arrobasProduzidas, litrosLeiteProduzidos);
+      carregarFinanceiro(activeId, arrobasProduzidas, litrosLeiteProduzidos);
       alert('Despesa registrada com sucesso!');
     } catch (err) {
       alert('Erro ao registrar despesa.');
@@ -100,12 +102,12 @@ export const Financeiro: React.FC = () => {
 
         <div className="flex items-center gap-3">
           <select
-            value={propriedadeId}
+            value={selectedFarm?.id || propriedadeId}
             onChange={e => {
               setPropriedadeId(e.target.value);
-              carregarFinanceiro(e.target.value, arrobasProduzidas, litrosLeiteProduzidos);
+              selectFarmById(e.target.value);
             }}
-            className="px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700"
+            className="px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 cursor-pointer"
           >
             {propriedades.length === 0 ? (
               <option value="">Nenhuma fazenda cadastrada</option>
