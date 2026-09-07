@@ -26,6 +26,7 @@ export const Propriedades: React.FC = () => {
   const { selectedFarm, selectFarmById, recarregarFazendas, propriedades: contextPropriedades } = useFarm();
   const [propriedades, setPropriedades] = useState<Propriedade[]>([]);
   const [produtores, setProdutores] = useState<Produtor[]>([]);
+  const [realBackendProducerIds, setRealBackendProducerIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState<boolean>(true);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [modalOpen, setModalOpen] = useState<boolean>(false);
@@ -64,11 +65,15 @@ export const Propriedades: React.FC = () => {
       setPropriedades(initialFarms);
 
       const prodsMap = new Map<string, Produtor>();
+      const backendIds = new Set<string>();
+
       (prodsData || []).forEach((p: Produtor) => {
         if (p && p.id) {
           prodsMap.set(p.id, p);
+          backendIds.add(p.id);
         }
       });
+      setRealBackendProducerIds(backendIds);
 
       try {
         const users = await usuarioService.listar().catch(() => []);
@@ -108,6 +113,36 @@ export const Propriedades: React.FC = () => {
   useEffect(() => {
     loadData();
   }, []);
+
+  const ensureRealProducerId = async (producerId: string): Promise<string> => {
+    if (!producerId) return '';
+    if (realBackendProducerIds.has(producerId)) return producerId;
+
+    const prod = produtores.find((p) => p.id === producerId);
+    if (!prod) return producerId;
+
+    try {
+      const doc = (prod.cpfCnpj && !prod.cpfCnpj.includes('Usuário Cadastrado') && prod.cpfCnpj.trim())
+        ? prod.cpfCnpj.trim()
+        : '000.000.000-00';
+      const created = await produtorService.criar({
+        nome: prod.nome,
+        cpfCnpj: doc,
+        telefone: prod.telefone || '(00) 00000-0000',
+        email: prod.email || `${prod.nome.toLowerCase().replace(/\s+/g, '.')}@agrotijuco.com.br`,
+      });
+      if (created && created.id) {
+        setRealBackendProducerIds((prev) => new Set(prev).add(created.id));
+        setProdutores((prev) =>
+          prev.map((p) => (p.id === producerId ? { ...p, id: created.id, cpfCnpj: doc } : p))
+        );
+        return created.id;
+      }
+    } catch (e) {
+      console.warn('Erro ao sincronizar produtor no backend:', e);
+    }
+    return producerId;
+  };
 
   const handleOpenModal = () => {
     setErrorMsg(null);
@@ -171,10 +206,14 @@ export const Propriedades: React.FC = () => {
         finalProdutorId = novoProd.id || undefined;
         finalProdutorNome = novoProd.nome;
 
-        // Atualiza lista de produtores locais
+        if (novoProd.id) {
+          setRealBackendProducerIds(prev => new Set(prev).add(novoProd.id));
+        }
         setProdutores(prev => [novoProd, ...prev]);
       } else if (finalProdutorId) {
-        const prod = produtores.find(p => p.id === finalProdutorId);
+        const realId = await ensureRealProducerId(finalProdutorId);
+        finalProdutorId = realId;
+        const prod = produtores.find(p => p.id === finalProdutorId || p.id === selectedProdutorId);
         finalProdutorNome = prod?.nome || 'Produtor Responsável';
       }
 
@@ -187,8 +226,37 @@ export const Propriedades: React.FC = () => {
         inscricaoEstadual: inscricaoEstadual.trim(),
       };
 
-      const created = await propriedadeService.criarParaProdutor(finalProdutorId || undefined, inputData);
+      let created: Propriedade;
+      if (finalProdutorId) {
+        created = await propriedadeService.criarParaProdutor(finalProdutorId, inputData);
+      } else {
+        try {
+          created = await propriedadeService.criarParaProdutor(undefined, inputData);
+        } catch (errSemProd: any) {
+          console.warn('Backend requer produtor_id, vinculando a produtor padrão do sistema:', errSemProd);
+          let prodGeral = produtores.find(
+            p => p.nome.includes('Sem Produtor') || p.nome.includes('Geral')
+          );
+          let prodGeralId = prodGeral?.id;
+          if (!prodGeralId || !realBackendProducerIds.has(prodGeralId)) {
+            const novoGeral = await produtorService.criar({
+              nome: 'Sem Produtor Vinculado',
+              cpfCnpj: '000.000.000-00',
+              email: 'sem.produtor@agrotijuco.com.br',
+              telefone: '(00) 00000-0000',
+            });
+            prodGeralId = novoGeral.id;
+            if (novoGeral.id) {
+              setRealBackendProducerIds(prev => new Set(prev).add(novoGeral.id));
+            }
+          }
+          created = await propriedadeService.criarParaProdutor(prodGeralId, inputData);
+          created.produtorNome = undefined;
+          created.produtorId = undefined;
+        }
+      }
 
+      const isDefaultProd = finalProdutorNome === 'Sem Produtor Vinculado' || finalProdutorNome.includes('Sem Produtor');
       const novaProp: Propriedade = {
         ...created,
         id: created.id || `prop-${Date.now()}`,
@@ -197,8 +265,8 @@ export const Propriedades: React.FC = () => {
         areaHectares: created.areaHectares || inputData.areaHectares,
         localizacao: created.localizacao || created.municipio || inputData.localizacao,
         municipio: created.municipio || inputData.localizacao,
-        produtorId: finalProdutorId || undefined,
-        produtorNome: finalProdutorNome || undefined,
+        produtorId: isDefaultProd ? undefined : (finalProdutorId || undefined),
+        produtorNome: isDefaultProd ? undefined : (finalProdutorNome || undefined),
       };
 
       setPropriedades(prev => [novaProp, ...prev]);
@@ -208,7 +276,7 @@ export const Propriedades: React.FC = () => {
       }
 
       setSuccessMsg(
-        finalProdutorNome
+        finalProdutorNome && !isDefaultProd
           ? `Propriedade "${novaProp.nome}" cadastrada e vinculada com sucesso a ${finalProdutorNome}!`
           : `Propriedade "${novaProp.nome}" cadastrada com sucesso (sem produtor vinculado)!`
       );
@@ -235,15 +303,16 @@ export const Propriedades: React.FC = () => {
     setSubmitting(true);
     try {
       if (newSelectedProdutorId) {
-        await propriedadeService.atribuirProdutor(selectedPropForReassign.id, newSelectedProdutorId);
-        const targetProd = produtores.find((p) => p.id === newSelectedProdutorId);
+        const realId = await ensureRealProducerId(newSelectedProdutorId);
+        await propriedadeService.atribuirProdutor(selectedPropForReassign.id, realId);
+        const targetProd = produtores.find((p) => p.id === newSelectedProdutorId || p.id === realId);
 
         setPropriedades((prev) =>
           prev.map((p) =>
             p.id === selectedPropForReassign.id
               ? {
                   ...p,
-                  produtorId: newSelectedProdutorId,
+                  produtorId: realId,
                   produtorNome: targetProd?.nome || 'Produtor Responsável',
                 }
               : p
@@ -251,7 +320,27 @@ export const Propriedades: React.FC = () => {
         );
         setSuccessMsg(`Propriedade "${selectedPropForReassign.nome || selectedPropForReassign.nomeFazenda}" vinculada ao produtor "${targetProd?.nome}" com sucesso!`);
       } else {
-        await propriedadeService.atribuirProdutor(selectedPropForReassign.id, null);
+        try {
+          await propriedadeService.atribuirProdutor(selectedPropForReassign.id, null);
+        } catch {
+          let prodGeral = produtores.find(
+            p => p.nome.includes('Sem Produtor') || p.nome.includes('Geral')
+          );
+          let prodGeralId = prodGeral?.id;
+          if (!prodGeralId || !realBackendProducerIds.has(prodGeralId)) {
+            const novoGeral = await produtorService.criar({
+              nome: 'Sem Produtor Vinculado',
+              cpfCnpj: '000.000.000-00',
+              email: 'sem.produtor@agrotijuco.com.br',
+              telefone: '(00) 00000-0000',
+            });
+            prodGeralId = novoGeral.id;
+            if (novoGeral.id) {
+              setRealBackendProducerIds(prev => new Set(prev).add(novoGeral.id));
+            }
+          }
+          await propriedadeService.atribuirProdutor(selectedPropForReassign.id, prodGeralId);
+        }
         setPropriedades((prev) =>
           prev.map((p) =>
             p.id === selectedPropForReassign.id
@@ -431,7 +520,7 @@ export const Propriedades: React.FC = () => {
                       <div className="flex items-center truncate">
                         <Building2 className="w-4 h-4 text-agro-primary mr-2 shrink-0" />
                         <span className="font-semibold text-slate-700 mr-1">Produtor:</span>
-                        {prop.produtorNome ? (
+                        {prop.produtorNome && !prop.produtorNome.includes('Sem Produtor') && !prop.produtorNome.includes('Administração Geral') ? (
                           <span className="truncate text-slate-900 font-medium">{prop.produtorNome}</span>
                         ) : (
                           <span className="truncate italic text-slate-400 font-medium">Sem produtor vinculado</span>

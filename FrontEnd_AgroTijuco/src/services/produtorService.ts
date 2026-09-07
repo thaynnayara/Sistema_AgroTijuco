@@ -3,7 +3,13 @@ import type { Produtor, CreateProdutorInput } from '../types';
 
 export const produtorService = {
   async criar(data: CreateProdutorInput): Promise<{ id: string } & Produtor> {
-    const response = await api.post<{ id: string } & Produtor>('/produtores', data);
+    const doc = data.cpfCnpj || (data as any).cpfOuCnpj || '000.000.000-00';
+    const payload = {
+      ...data,
+      cpfCnpj: doc,
+      cpfOuCnpj: doc,
+    };
+    const response = await api.post<{ id: string } & Produtor>('/produtores', payload);
     return response.data;
   },
 
