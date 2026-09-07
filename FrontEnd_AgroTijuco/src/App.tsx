@@ -7,7 +7,6 @@ import { DashboardLayout } from './layouts/DashboardLayout';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { Usuarios } from './pages/Usuarios';
-import { Produtores } from './pages/Produtores';
 import { Propriedades } from './pages/Propriedades';
 import { Animais } from './pages/Animais';
 import { Pesagens } from './pages/Pesagens';
@@ -32,7 +31,7 @@ export const App: React.FC = () => {
               <Route element={<DashboardLayout />}>
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/usuarios" element={<Usuarios />} />
-                <Route path="/produtores" element={<Produtores />} />
+                <Route path="/produtores" element={<Navigate to="/propriedades" replace />} />
                 <Route path="/propriedades" element={<Propriedades />} />
                 <Route path="/animais" element={<Animais />} />
                 <Route path="/pesagens" element={<Pesagens />} />

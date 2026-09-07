@@ -19,12 +19,10 @@ function obterUsuariosLocais(): User[] {
   try {
     const list = JSON.parse(data);
     if (!Array.isArray(list)) return [];
-    // Filtra e descarta qualquer resquício de mock antigo
     return list.filter((u: User) => 
       !u.email.includes('walter.barreto') && 
       !u.email.includes('carlos.ribeiro') && 
-      !u.email.includes('marcos.operador') &&
-      !u.email.includes('admin@agrotijuco')
+      !u.email.includes('marcos.operador')
     );
   } catch {
     return [];
@@ -35,8 +33,7 @@ function salvarUsuariosLocais(usuarios: User[]) {
   const limpos = (usuarios || []).filter((u: User) => 
     !u.email.includes('walter.barreto') && 
     !u.email.includes('carlos.ribeiro') && 
-    !u.email.includes('marcos.operador') &&
-    !u.email.includes('admin@agrotijuco')
+    !u.email.includes('marcos.operador')
   );
   localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(limpos));
 }

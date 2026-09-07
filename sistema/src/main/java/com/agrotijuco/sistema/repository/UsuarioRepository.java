@@ -20,7 +20,7 @@ public interface UsuarioRepository extends JpaRepository<Usuario, UUID> {
     @Query(value = "SELECT CASE WHEN COUNT(*) > 0 THEN TRUE ELSE FALSE END FROM tb_usuarios WHERE LOWER(email) = LOWER(:email)", nativeQuery = true)
     boolean existsByEmailIgnoringTenant(@Param("email") String email);
 
-    @Query(value = "SELECT * FROM tb_usuarios ORDER BY created_at DESC", nativeQuery = true)
+    @Query(value = "SELECT * FROM tb_usuarios ORDER BY created_at DESC NULLS LAST, nome ASC", nativeQuery = true)
     java.util.List<Usuario> findAllUsersGlobal();
 
     @Query(value = "SELECT * FROM tb_usuarios WHERE id = :id LIMIT 1", nativeQuery = true)

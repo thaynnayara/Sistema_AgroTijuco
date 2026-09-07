@@ -81,7 +81,7 @@ export const Usuarios: React.FC = () => {
         email: '',
         senha: '',
         role: 'PRODUTOR',
-        tenantId: propriedades[0]?.nome || 'Fazenda AgroTijuco',
+        tenantId: 'Fazenda AgroTijuco',
       });
     } catch (err: any) {
       setErrorMsg(err.message || 'Erro ao cadastrar usuário.');
@@ -202,10 +202,10 @@ export const Usuarios: React.FC = () => {
   const totalAtivos = usuarios.filter((u) => u.ativo !== false).length;
 
   const filtrados = usuarios.filter((u) => {
-    const matchSearch =
-      u.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (u.tenantId && u.tenantId.toLowerCase().includes(searchTerm.toLowerCase()));
+    const nome = (u.nome || '').toLowerCase();
+    const email = (u.email || '').toLowerCase();
+    const term = searchTerm.toLowerCase();
+    const matchSearch = nome.includes(term) || email.includes(term);
 
     if (!matchSearch) return false;
     if (filtroRole === 'TODOS') return true;
@@ -359,7 +359,7 @@ export const Usuarios: React.FC = () => {
                 <tr>
                   <th className="px-5 py-3.5">Usuário / Identificação</th>
                   <th className="px-4 py-3.5">Perfil de Acesso</th>
-                  <th className="px-4 py-3.5">Fazenda / Tenant</th>
+                  <th className="px-4 py-3.5">Fazenda Vinculada</th>
                   <th className="px-4 py-3.5">Status</th>
                   <th className="px-4 py-3.5 text-right">Ações</th>
                 </tr>
@@ -380,11 +380,11 @@ export const Usuarios: React.FC = () => {
                               ? 'bg-agro-primary text-white'
                               : 'bg-amber-500 text-white'
                           }`}>
-                            {u.nome.charAt(0).toUpperCase()}
+                            {(u.nome || 'U').charAt(0).toUpperCase()}
                           </div>
                           <div>
                             <div className="font-bold text-slate-900 flex items-center">
-                              {u.nome}
+                              {u.nome || 'Sem Nome'}
                               {isCurrentUser && (
                                 <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-800 text-[10px] font-extrabold rounded-full">
                                   Você
@@ -426,17 +426,31 @@ export const Usuarios: React.FC = () => {
                         )}
                       </td>
 
-                      {/* FAZENDA / TENANT */}
+                      {/* FAZENDA VINCULADA */}
                       <td className="px-4 py-4">
-                        <div className="flex items-center text-slate-800 font-medium">
-                          <Building2 className="w-4 h-4 mr-1.5 text-slate-400" />
-                          <span>{u.tenantId || 'Fazenda AgroTijuco'}</span>
-                        </div>
-                        {u.produtorNome && (
-                          <div className="text-[11px] text-slate-500 mt-0.5">
-                            Produtor: {u.produtorNome}
-                          </div>
-                        )}
+                        {u.role === 'ADMIN' || u.role === 'GESTOR' ? (
+                          <span className="inline-flex items-center text-xs text-slate-500 font-medium">
+                            Gestão Global da Plataforma
+                          </span>
+                        ) : (() => {
+                          const fazenda = propriedades.find(
+                            (p) => (u.produtorId && p.produtorId === u.produtorId) || 
+                                   (p.produtorNome && (u.nome || '') && p.produtorNome.toLowerCase() === u.nome.toLowerCase())
+                          );
+                          if (fazenda) {
+                            return (
+                              <div className="flex items-center text-agro-forest font-semibold text-xs">
+                                <Building2 className="w-4 h-4 mr-1.5 text-agro-primary shrink-0" />
+                                <span>{fazenda.nomeFazenda || fazenda.nome}</span>
+                              </div>
+                            );
+                          }
+                          return (
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                              Sem fazenda vinculada
+                            </span>
+                          );
+                        })()}
                       </td>
 
                       {/* STATUS */}
@@ -561,40 +575,20 @@ export const Usuarios: React.FC = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Perfil de Permissão
-                  </label>
-                  <select
-                    value={formNovo.role}
-                    onChange={(e) => setFormNovo({ ...formNovo, role: e.target.value as any })}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-agro-primary"
-                  >
-                    <option value="ADMIN">ADMIN (Administrador Geral)</option>
-                    <option value="GESTOR">GESTOR (Gestor da Fazenda)</option>
-                    <option value="PRODUTOR">PRODUTOR (Produtor Rural)</option>
-                    <option value="OPERADOR">OPERADOR (Operador de Campo)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Fazenda / Propriedade (Tenant)
-                  </label>
-                  <select
-                    value={formNovo.tenantId}
-                    onChange={(e) => setFormNovo({ ...formNovo, tenantId: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-agro-primary"
-                  >
-                    <option value="Fazenda AgroTijuco">Fazenda AgroTijuco (Principal)</option>
-                    {propriedades.map((p) => (
-                      <option key={p.id} value={p.nome || p.nomeFazenda}>
-                        {p.nome || p.nomeFazenda}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Perfil de Permissão
+                </label>
+                <select
+                  value={formNovo.role}
+                  onChange={(e) => setFormNovo({ ...formNovo, role: e.target.value as any })}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-agro-primary"
+                >
+                  <option value="PRODUTOR">PRODUTOR (Produtor Rural)</option>
+                  <option value="GESTOR">GESTOR (Gestor da Fazenda)</option>
+                  <option value="ADMIN">ADMIN (Administrador Geral)</option>
+                  <option value="OPERADOR">OPERADOR (Operador de Campo)</option>
+                </select>
               </div>
 
               <div className="pt-4 flex items-center justify-end space-x-3 border-t border-slate-100">

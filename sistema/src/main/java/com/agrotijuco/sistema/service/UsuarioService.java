@@ -25,8 +25,16 @@ public class UsuarioService {
     }
 
     public List<UsuarioDTO> listarTodos() {
-        return usuarioRepository.findAllUsersGlobal()
-                .stream()
+        List<Usuario> list;
+        try {
+            list = usuarioRepository.findAllUsersGlobal();
+            if (list == null || list.isEmpty()) {
+                list = usuarioRepository.findAll();
+            }
+        } catch (Exception e) {
+            list = usuarioRepository.findAll();
+        }
+        return list.stream()
                 .map(UsuarioDTO::new)
                 .collect(Collectors.toList());
     }

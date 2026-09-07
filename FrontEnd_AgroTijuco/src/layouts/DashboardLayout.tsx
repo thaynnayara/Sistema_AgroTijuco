@@ -4,7 +4,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { 
   Sprout, 
   LayoutDashboard, 
-  Users, 
   Home, 
   Beef, 
   Scale, 
@@ -86,7 +85,6 @@ export const DashboardLayout: React.FC = () => {
     { name: 'Visão Geral', path: '/dashboard', icon: LayoutDashboard },
     ...(isAdmin || isGestor
       ? [
-          { name: 'Produtores Rurais', path: '/produtores', icon: Users },
           { name: 'Usuários Cadastrados', path: '/usuarios', icon: ShieldCheck },
         ]
       : []),
