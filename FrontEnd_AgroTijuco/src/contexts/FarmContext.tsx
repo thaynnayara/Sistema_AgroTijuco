@@ -13,7 +13,7 @@ interface FarmContextData {
   setSelectedFarm: (farm: Propriedade | null) => void;
   selectFarmById: (id: string) => void;
   atualizarFazenda: (id: string, dados: Partial<Propriedade>) => Promise<Propriedade>;
-  cadastrarFazenda: (dados: CreatePropriedadeInput, produtorId: string) => Promise<Propriedade>;
+  cadastrarFazenda: (dados: CreatePropriedadeInput, produtorId?: string) => Promise<Propriedade>;
   recarregarFazendas: () => Promise<void>;
   loadingFarms: boolean;
 }
@@ -141,7 +141,7 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const cadastrarFazenda = async (
     dados: CreatePropriedadeInput,
-    produtorId: string
+    produtorId?: string
   ): Promise<Propriedade> => {
     let criada: Propriedade;
     try {
@@ -154,7 +154,7 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
         nomeFazenda: dados.nome,
         municipio: dados.localizacao,
         localizacao: dados.localizacao,
-        produtorId,
+        produtorId: produtorId || undefined,
       };
     }
 
@@ -165,7 +165,7 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
       nomeFazenda: criada.nomeFazenda || dados.nome,
       municipio: criada.municipio || dados.localizacao,
       localizacao: criada.localizacao || dados.localizacao,
-      produtorId,
+      produtorId: produtorId || criada.produtorId,
     };
 
     const lista = [formatada, ...propriedades];

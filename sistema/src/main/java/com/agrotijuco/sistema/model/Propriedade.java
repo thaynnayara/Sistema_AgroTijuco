@@ -29,7 +29,7 @@ public class Propriedade extends Auditable {
     private String inscricaoEstadual;
 
     @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "produtor_id", nullable = false)
+    @JoinColumn(name = "produtor_id", nullable = true)
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private Produtor produtor;
 

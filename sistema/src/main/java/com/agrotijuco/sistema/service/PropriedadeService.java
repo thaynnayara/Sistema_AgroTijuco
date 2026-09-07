@@ -20,6 +20,9 @@ public class PropriedadeService {
     @Autowired
     private ProdutorRepository produtorRepository;
 
+    @Autowired
+    private com.agrotijuco.sistema.repository.UsuarioRepository usuarioRepository;
+
     public List<Propriedade> listarTodas() {
         List<Propriedade> list = propriedadeRepository.findAllGlobal();
         if (list.isEmpty()) {
@@ -36,12 +39,63 @@ public class PropriedadeService {
         return list;
     }
 
+    private Produtor resolverProdutor(UUID produtorId) {
+        if (produtorId == null) {
+            return null;
+        }
+
+        // 1. Tenta buscar em tb_produtores por ID
+        var optProdutor = produtorRepository.findByIdIgnoringTenant(produtorId);
+        if (optProdutor.isPresent()) {
+            return optProdutor.get();
+        }
+
+        var optProdutorFallback = produtorRepository.findById(produtorId);
+        if (optProdutorFallback.isPresent()) {
+            return optProdutorFallback.get();
+        }
+
+        // 2. Se não encontrou, verifica se o produtorId é o ID de um Usuario com role PRODUTOR
+        var optUsuario = usuarioRepository.findByIdIgnoringTenant(produtorId);
+        if (optUsuario.isEmpty()) {
+            optUsuario = usuarioRepository.findById(produtorId);
+        }
+
+        if (optUsuario.isPresent()) {
+            com.agrotijuco.sistema.model.Usuario u = optUsuario.get();
+            if (u.getProdutorId() != null) {
+                var p = produtorRepository.findByIdIgnoringTenant(u.getProdutorId());
+                if (p.isPresent()) {
+                    return p.get();
+                }
+            }
+            // Tenta por email
+            var pEmail = produtorRepository.findByEmailIgnoringTenant(u.getEmail());
+            if (pEmail.isPresent()) {
+                u.setProdutorId(pEmail.get().getId());
+                usuarioRepository.save(u);
+                return pEmail.get();
+            }
+            // Cria registro de produtor para este usuário automaticamente
+            Produtor novo = new Produtor(
+                    u.getNome(),
+                    "CPF-" + UUID.randomUUID().toString().substring(0, 8),
+                    u.getEmail(),
+                    ""
+            );
+            novo.setTenantId(u.getTenantId() != null && !u.getTenantId().isBlank() ? u.getTenantId() : "Fazenda AgroTijuco");
+            novo = produtorRepository.save(novo);
+            u.setProdutorId(novo.getId());
+            usuarioRepository.save(u);
+            return novo;
+        }
+
+        throw new RuntimeException("Não é possível cadastrar a propriedade. Produtor não encontrado com o ID informado.");
+    }
+
     @Transactional
     public Propriedade cadastrar(Propriedade propriedade, UUID produtorId) {
-        // Regra 1: O Produtor precisa existir no banco (atribuído pela gestora)
-        Produtor produtor = produtorRepository.findByIdIgnoringTenant(produtorId)
-                .orElseGet(() -> produtorRepository.findById(produtorId)
-                        .orElseThrow(() -> new RuntimeException("Não é possível cadastrar a propriedade. Produtor não encontrado.")));
+        Produtor produtor = resolverProdutor(produtorId);
 
         // Normalização de campos para não violar restrições NOT NULL
         if (propriedade.getNomeFazenda() == null || propriedade.getNomeFazenda().isBlank()) {
@@ -65,7 +119,10 @@ public class PropriedadeService {
         }
 
         if (propriedade.getTenantId() == null || propriedade.getTenantId().isBlank()) {
-            propriedade.setTenantId(produtor.getTenantId() != null && !produtor.getTenantId().isBlank() ? produtor.getTenantId() : "Fazenda AgroTijuco");
+            String tId = (produtor != null && produtor.getTenantId() != null && !produtor.getTenantId().isBlank())
+                    ? produtor.getTenantId()
+                    : "Fazenda AgroTijuco";
+            propriedade.setTenantId(tId);
         }
 
         propriedade.setProdutor(produtor);
@@ -75,10 +132,7 @@ public class PropriedadeService {
     @Transactional
     public Propriedade atribuirProdutor(UUID propriedadeId, UUID novoProdutorId) {
         Propriedade propriedade = buscarPorId(propriedadeId);
-
-        Produtor novoProdutor = produtorRepository.findByIdIgnoringTenant(novoProdutorId)
-                .orElseGet(() -> produtorRepository.findById(novoProdutorId)
-                        .orElseThrow(() -> new RuntimeException("Produtor não encontrado para atribuição.")));
+        Produtor novoProdutor = resolverProdutor(novoProdutorId);
 
         propriedade.setProdutor(novoProdutor);
         return propriedadeRepository.save(propriedade);

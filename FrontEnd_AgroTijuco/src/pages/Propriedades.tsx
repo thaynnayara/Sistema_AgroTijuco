@@ -63,37 +63,43 @@ export const Propriedades: React.FC = () => {
         : contextPropriedades;
       setPropriedades(initialFarms);
 
-      let prods = prodsData || [];
-      if (prods.length === 0) {
-        try {
-          const users = await usuarioService.listar().catch(() => []);
-          const prodUsers = (users || [])
-            .filter((u: any) => u.role === 'PRODUTOR' || u.perfil === 'PRODUTOR')
-            .map((u: any) => ({
-              id: u.produtorId || u.id,
-              nome: u.nome,
-              cpfCnpj: 'Produtor Cadastrado',
-              email: u.email,
-              telefone: '',
-            }));
-          if (prodUsers.length > 0) {
-            prods = prodUsers;
-          }
-        } catch {}
-      }
+      const prodsMap = new Map<string, Produtor>();
+      (prodsData || []).forEach((p: Produtor) => {
+        if (p && p.id) {
+          prodsMap.set(p.id, p);
+        }
+      });
 
+      try {
+        const users = await usuarioService.listar().catch(() => []);
+        (users || [])
+          .filter((u: any) => u.role === 'PRODUTOR' || u.perfil === 'PRODUTOR')
+          .forEach((u: any) => {
+            const uid = u.produtorId || u.id;
+            const exists = Array.from(prodsMap.values()).some(
+              (p) => p.id === uid || p.id === u.id || (p.nome && u.nome && p.nome.trim().toLowerCase() === u.nome.trim().toLowerCase())
+            );
+            if (!exists) {
+              prodsMap.set(u.id, {
+                id: u.id,
+                nome: u.nome,
+                cpfCnpj: u.cpfCnpj || 'Produtor (Usuário Cadastrado)',
+                email: u.email,
+                telefone: u.telefone || '',
+              });
+            }
+          });
+      } catch {}
+
+      const prods = Array.from(prodsMap.values());
       setProdutores(prods);
-
-      if (prods.length === 0) {
-        setIsNewProducerMode(true);
-      } else {
-        setIsNewProducerMode(false);
-        setSelectedProdutorId(prods[0]?.id || '');
-      }
+      setIsNewProducerMode(false);
+      setSelectedProdutorId('');
     } catch {
       setPropriedades(contextPropriedades);
       setProdutores([]);
-      setIsNewProducerMode(true);
+      setIsNewProducerMode(false);
+      setSelectedProdutorId('');
     } finally {
       setLoading(false);
     }
@@ -115,12 +121,8 @@ export const Propriedades: React.FC = () => {
     setNovoProdutorTelefone('');
     setNovoProdutorEmail('');
 
-    if (produtores.length === 0) {
-      setIsNewProducerMode(true);
-    } else {
-      setIsNewProducerMode(false);
-      setSelectedProdutorId(produtores[0]?.id || '');
-    }
+    setIsNewProducerMode(false);
+    setSelectedProdutorId('');
     setModalOpen(true);
   };
 
@@ -143,7 +145,7 @@ export const Propriedades: React.FC = () => {
     }
 
     try {
-      let finalProdutorId = selectedProdutorId;
+      let finalProdutorId: string | undefined = selectedProdutorId || undefined;
       let finalProdutorNome = '';
 
       // Se o usuário está cadastrando um novo produtor inline
@@ -166,20 +168,14 @@ export const Propriedades: React.FC = () => {
           email: novoProdutorEmail.trim() || 'produtor@agrotijuco.com.br',
         });
 
-        finalProdutorId = novoProd.id || '';
+        finalProdutorId = novoProd.id || undefined;
         finalProdutorNome = novoProd.nome;
 
         // Atualiza lista de produtores locais
         setProdutores(prev => [novoProd, ...prev]);
-      } else {
+      } else if (finalProdutorId) {
         const prod = produtores.find(p => p.id === finalProdutorId);
         finalProdutorNome = prod?.nome || 'Produtor Responsável';
-      }
-
-      if (!finalProdutorId) {
-        setErrorMsg('Selecione ou cadastre o produtor responsável pela fazenda.');
-        setSubmitting(false);
-        return;
       }
 
       const inputData = {
@@ -191,7 +187,7 @@ export const Propriedades: React.FC = () => {
         inscricaoEstadual: inscricaoEstadual.trim(),
       };
 
-      const created = await propriedadeService.criarParaProdutor(finalProdutorId, inputData);
+      const created = await propriedadeService.criarParaProdutor(finalProdutorId || undefined, inputData);
 
       const novaProp: Propriedade = {
         ...created,
@@ -201,8 +197,8 @@ export const Propriedades: React.FC = () => {
         areaHectares: created.areaHectares || inputData.areaHectares,
         localizacao: created.localizacao || created.municipio || inputData.localizacao,
         municipio: created.municipio || inputData.localizacao,
-        produtorId: finalProdutorId,
-        produtorNome: finalProdutorNome,
+        produtorId: finalProdutorId || undefined,
+        produtorNome: finalProdutorNome || undefined,
       };
 
       setPropriedades(prev => [novaProp, ...prev]);
@@ -211,7 +207,11 @@ export const Propriedades: React.FC = () => {
         selectFarmById(novaProp.id!);
       }
 
-      setSuccessMsg(`Propriedade "${novaProp.nome}" cadastrada e vinculada com sucesso a ${finalProdutorNome}!`);
+      setSuccessMsg(
+        finalProdutorNome
+          ? `Propriedade "${novaProp.nome}" cadastrada e vinculada com sucesso a ${finalProdutorNome}!`
+          : `Propriedade "${novaProp.nome}" cadastrada com sucesso (sem produtor vinculado)!`
+      );
       setTimeout(() => {
         setModalOpen(false);
         setSuccessMsg(null);
@@ -226,35 +226,51 @@ export const Propriedades: React.FC = () => {
 
   const handleOpenReassign = (prop: Propriedade) => {
     setSelectedPropForReassign(prop);
-    setNewSelectedProdutorId(prop.produtorId || (produtores[0]?.id || ''));
+    setNewSelectedProdutorId(prop.produtorId || '');
     setReassignModalOpen(true);
   };
 
   const handleSaveReassign = async () => {
-    if (!selectedPropForReassign || !selectedPropForReassign.id || !newSelectedProdutorId) return;
+    if (!selectedPropForReassign || !selectedPropForReassign.id) return;
     setSubmitting(true);
     try {
-      await propriedadeService.atribuirProdutor(selectedPropForReassign.id, newSelectedProdutorId);
-      const targetProd = produtores.find((p) => p.id === newSelectedProdutorId);
+      if (newSelectedProdutorId) {
+        await propriedadeService.atribuirProdutor(selectedPropForReassign.id, newSelectedProdutorId);
+        const targetProd = produtores.find((p) => p.id === newSelectedProdutorId);
 
-      setPropriedades((prev) =>
-        prev.map((p) =>
-          p.id === selectedPropForReassign.id
-            ? {
-                ...p,
-                produtorId: newSelectedProdutorId,
-                produtorNome: targetProd?.nome || 'Produtor Responsável',
-              }
-            : p
-        )
-      );
+        setPropriedades((prev) =>
+          prev.map((p) =>
+            p.id === selectedPropForReassign.id
+              ? {
+                  ...p,
+                  produtorId: newSelectedProdutorId,
+                  produtorNome: targetProd?.nome || 'Produtor Responsável',
+                }
+              : p
+          )
+        );
+        setSuccessMsg(`Propriedade "${selectedPropForReassign.nome || selectedPropForReassign.nomeFazenda}" vinculada ao produtor "${targetProd?.nome}" com sucesso!`);
+      } else {
+        await propriedadeService.atribuirProdutor(selectedPropForReassign.id, null);
+        setPropriedades((prev) =>
+          prev.map((p) =>
+            p.id === selectedPropForReassign.id
+              ? {
+                  ...p,
+                  produtorId: undefined,
+                  produtorNome: undefined,
+                }
+              : p
+          )
+        );
+        setSuccessMsg(`Vínculo de produtor removido da propriedade "${selectedPropForReassign.nome || selectedPropForReassign.nomeFazenda}".`);
+      }
 
       await recarregarFazendas();
-      setSuccessMsg(`Propriedade "${selectedPropForReassign.nome || selectedPropForReassign.nomeFazenda}" vinculada ao produtor "${targetProd?.nome}" com sucesso!`);
       setReassignModalOpen(false);
       setSelectedPropForReassign(null);
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Erro ao reatribuir produtor à fazenda.');
+      alert(err.response?.data?.message || 'Erro ao atualizar produtor da fazenda.');
     } finally {
       setSubmitting(false);
     }
@@ -415,16 +431,20 @@ export const Propriedades: React.FC = () => {
                       <div className="flex items-center truncate">
                         <Building2 className="w-4 h-4 text-agro-primary mr-2 shrink-0" />
                         <span className="font-semibold text-slate-700 mr-1">Produtor:</span>
-                        <span className="truncate text-slate-900 font-medium">{prop.produtorNome || 'Produtor Responsável'}</span>
+                        {prop.produtorNome ? (
+                          <span className="truncate text-slate-900 font-medium">{prop.produtorNome}</span>
+                        ) : (
+                          <span className="truncate italic text-slate-400 font-medium">Sem produtor vinculado</span>
+                        )}
                       </div>
 
                       {(isGestor || isAdmin) && (
                         <button
                           onClick={() => handleOpenReassign(prop)}
                           className="ml-2 text-[11px] text-agro-primary hover:underline font-bold shrink-0 cursor-pointer"
-                          title="Vincular a outro produtor"
+                          title={prop.produtorId ? "Vincular a outro produtor" : "Vincular produtor"}
                         >
-                          Trocar
+                          {prop.produtorId ? 'Trocar' : 'Vincular'}
                         </button>
                       )}
                     </div>
@@ -463,7 +483,7 @@ export const Propriedades: React.FC = () => {
                         onClick={() => handleOpenReassign(prop)}
                         className="text-slate-600 hover:text-agro-primary hover:underline font-semibold cursor-pointer"
                       >
-                        Vincular Produtor
+                        {prop.produtorId ? 'Trocar Produtor' : 'Vincular Produtor'}
                       </button>
                       <button
                         onClick={() => handleDelete(prop)}
@@ -503,7 +523,7 @@ export const Propriedades: React.FC = () => {
                   onChange={(e) => setNewSelectedProdutorId(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-agro-primary cursor-pointer"
                 >
-                  <option value="">-- Selecione o Produtor --</option>
+                  <option value="">-- Nenhum (Desvincular produtor) --</option>
                   {produtores.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.nome} {p.cpfCnpj ? `(${p.cpfCnpj})` : ''}
@@ -523,7 +543,7 @@ export const Propriedades: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleSaveReassign}
-                  disabled={!newSelectedProdutorId || submitting}
+                  disabled={submitting}
                   className="px-5 py-2 text-sm font-semibold text-white bg-agro-primary hover:bg-agro-primary-hover rounded-xl shadow-sm cursor-pointer disabled:opacity-50 flex items-center"
                 >
                   {submitting && <Loader2 className="w-4 h-4 animate-spin mr-1.5" />}
@@ -544,7 +564,7 @@ export const Propriedades: React.FC = () => {
               Cadastrar Propriedade Rural
             </h2>
             <p className="text-xs text-slate-500 mb-4">
-              Preencha os dados da fazenda e vincule diretamente ao produtor responsável.
+              Preencha os dados da fazenda e vincule opcionalmente ao produtor responsável.
             </p>
 
             {errorMsg && (
@@ -567,31 +587,30 @@ export const Propriedades: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-800 flex items-center">
                     <Building2 className="w-4 h-4 text-agro-primary mr-1.5" />
-                    Produtor Responsável
+                    Produtor Responsável (Opcional)
                   </span>
 
-                  {produtores.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setIsNewProducerMode(!isNewProducerMode)}
-                      className="text-xs text-agro-primary hover:underline font-bold flex items-center cursor-pointer"
-                    >
-                      <UserPlus className="w-3.5 h-3.5 mr-1" />
-                      {isNewProducerMode ? 'Selecionar Existente' : '+ Novo Produtor'}
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => setIsNewProducerMode(!isNewProducerMode)}
+                    className="text-xs text-agro-primary hover:underline font-bold flex items-center cursor-pointer"
+                  >
+                    <UserPlus className="w-3.5 h-3.5 mr-1" />
+                    {isNewProducerMode ? 'Selecionar da Lista / Sem Produtor' : '+ Novo Produtor'}
+                  </button>
                 </div>
 
                 {!isNewProducerMode ? (
                   <div>
                     <label className="block text-xs font-medium text-slate-600 mb-1">
-                      Escolha o produtor na lista
+                      Escolha o produtor na lista (opcional)
                     </label>
                     <select
                       value={selectedProdutorId}
                       onChange={(e) => setSelectedProdutorId(e.target.value)}
                       className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-agro-primary cursor-pointer"
                     >
+                      <option value="">-- Sem produtor vinculado (Vincular depois) --</option>
                       {produtores.map((p) => (
                         <option key={p.id} value={p.id}>
                           {p.nome} {p.cpfCnpj ? `(${p.cpfCnpj})` : ''}

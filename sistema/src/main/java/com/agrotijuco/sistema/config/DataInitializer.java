@@ -7,6 +7,7 @@ import com.agrotijuco.sistema.repository.UsuarioRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
@@ -17,14 +18,21 @@ public class DataInitializer implements CommandLineRunner {
 
     private final UsuarioRepository usuarioRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JdbcTemplate jdbcTemplate;
 
-    public DataInitializer(UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder) {
+    public DataInitializer(UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder, JdbcTemplate jdbcTemplate) {
         this.usuarioRepository = usuarioRepository;
         this.passwordEncoder = passwordEncoder;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     @Override
     public void run(String... args) {
+        try {
+            jdbcTemplate.execute("ALTER TABLE tb_propriedades ALTER COLUMN produtor_id DROP NOT NULL");
+        } catch (Exception e) {
+            // Ignora se o banco for H2 ou a coluna já for nullable
+        }
         garantirUsuarioAdmin("Thaynná Yara Admin", "thaynna.yara@agrotijuco.com.br", "AdminAgro2026!", "Fazenda AgroTijuco", Role.ADMIN);
         garantirUsuarioAdmin("Thaynná Yara", "thaynna@agrotijuco.com.br", "AdminAgro2026!", "Fazenda AgroTijuco", Role.ADMIN);
     }

@@ -32,7 +32,17 @@ public class PropriedadeController {
         return ResponseEntity.ok(service.listarPorProdutor(produtorId));
     }
 
-    // Apenas a Gestora/Admin pode cadastrar nova propriedade e atribuir a um produtor
+    @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'GESTOR')")
+    public ResponseEntity<Propriedade> cadastrarDireto(
+            @RequestBody Propriedade propriedade,
+            @RequestParam(required = false) UUID produtorId) {
+        UUID targetProdutorId = produtorId != null ? produtorId : propriedade.getProdutorId();
+        Propriedade novaPropriedade = service.cadastrar(propriedade, targetProdutorId);
+        return ResponseEntity.status(HttpStatus.CREATED).body(novaPropriedade);
+    }
+
+    // Compatibilidade: cadastro associado diretamente a um produtor na URL
     @PostMapping("/produtor/{produtorId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'GESTOR')")
     public ResponseEntity<Propriedade> cadastrar(
@@ -51,6 +61,13 @@ public class PropriedadeController {
             @PathVariable UUID produtorId) {
 
         Propriedade atualizada = service.atribuirProdutor(propriedadeId, produtorId);
+        return ResponseEntity.ok(atualizada);
+    }
+
+    @PutMapping("/{propriedadeId}/desvincular-produtor")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GESTOR')")
+    public ResponseEntity<Propriedade> desvincularProdutor(@PathVariable UUID propriedadeId) {
+        Propriedade atualizada = service.atribuirProdutor(propriedadeId, null);
         return ResponseEntity.ok(atualizada);
     }
 
