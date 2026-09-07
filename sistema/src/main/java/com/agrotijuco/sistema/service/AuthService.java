@@ -40,11 +40,14 @@ public class AuthService {
         String previousTenant = TenantContext.getCurrentTenant();
         Usuario usuario = new Usuario();
         try {
-            TenantContext.setCurrentTenant(dto.getTenantId());
-            usuario.setNome(dto.getNome());
+            String tenant = (dto.getTenantId() != null && !dto.getTenantId().isBlank())
+                    ? dto.getTenantId().trim()
+                    : "Fazenda AgroTijuco";
+            TenantContext.setCurrentTenant(tenant);
+            usuario.setNome(dto.getNome() != null ? dto.getNome().trim() : "");
             usuario.setEmail(normalizedEmail);
             usuario.setSenha(passwordEncoder.encode(dto.getSenha()));
-            usuario.setTenantId(dto.getTenantId());
+            usuario.setTenantId(tenant);
             usuario.setRole(dto.getRole() != null ? dto.getRole() : com.agrotijuco.sistema.model.Role.PRODUTOR);
             usuario.setAtivo(true);
 
@@ -55,7 +58,7 @@ public class AuthService {
                         usuario.getEmail(),
                         ""
                 );
-                produtor.setTenantId(dto.getTenantId());
+                produtor.setTenantId(tenant);
                 produtor = produtorRepository.save(produtor);
                 usuario.setProdutorId(produtor.getId());
             }

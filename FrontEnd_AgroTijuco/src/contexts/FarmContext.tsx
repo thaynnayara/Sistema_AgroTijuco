@@ -27,12 +27,9 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed)) {
-          // Purga resquícios de mocks antigos de Walter Barreto / Santa Luzia
+          // Purga resquícios de mocks antigos de Walter Barreto
           return parsed.filter((p: Propriedade) => 
-            !p.produtorNome?.includes('Walter Barreto') &&
-            !p.nomeFazenda?.includes('Santa Luzia') &&
-            !p.nomeFazenda?.includes('Vista Alegre') &&
-            !p.nomeFazenda?.includes('Boa Esperança')
+            !p.produtorNome?.includes('Walter Barreto')
           );
         }
       } catch {}
@@ -95,10 +92,7 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed)) {
           farms = parsed.filter((p: Propriedade) => 
-            !p.produtorNome?.includes('Walter Barreto') &&
-            !p.nomeFazenda?.includes('Santa Luzia') &&
-            !p.nomeFazenda?.includes('Vista Alegre') &&
-            !p.nomeFazenda?.includes('Boa Esperança')
+            !p.produtorNome?.includes('Walter Barreto')
           );
         }
       } catch {}

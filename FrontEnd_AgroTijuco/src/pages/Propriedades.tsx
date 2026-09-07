@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { propriedadeService } from '../services/propriedadeService';
 import { produtorService } from '../services/produtorService';
+import { usuarioService } from '../services/usuarioService';
 import { useAuth } from '../contexts/AuthContext';
 import { useFarm } from '../contexts/FarmContext';
 import type { Propriedade, Produtor } from '../types';
@@ -61,13 +62,33 @@ export const Propriedades: React.FC = () => {
         ? propsData
         : contextPropriedades;
       setPropriedades(initialFarms);
-      const prods = prodsData || [];
+
+      let prods = prodsData || [];
+      if (prods.length === 0) {
+        try {
+          const users = await usuarioService.listar().catch(() => []);
+          const prodUsers = (users || [])
+            .filter((u: any) => u.role === 'PRODUTOR' || u.perfil === 'PRODUTOR')
+            .map((u: any) => ({
+              id: u.produtorId || u.id,
+              nome: u.nome,
+              cpfCnpj: 'Produtor Cadastrado',
+              email: u.email,
+              telefone: '',
+            }));
+          if (prodUsers.length > 0) {
+            prods = prodUsers;
+          }
+        } catch {}
+      }
+
       setProdutores(prods);
 
       if (prods.length === 0) {
         setIsNewProducerMode(true);
-      } else if (!selectedProdutorId && prods.length > 0) {
-        setSelectedProdutorId(prods[0].id || '');
+      } else {
+        setIsNewProducerMode(false);
+        setSelectedProdutorId(prods[0]?.id || '');
       }
     } catch {
       setPropriedades(contextPropriedades);

@@ -19,8 +19,7 @@ public class RegisterRequestDTO {
     @Size(min = 8, message = "A senha deve conter no mínimo 8 caracteres")
     private String senha;
 
-    @NotBlank(message = "Tenant ID é obrigatório para isolamento do cliente")
-    private String tenantId;
+    private String tenantId = "Fazenda AgroTijuco";
 
     private Role role = Role.PRODUTOR;
 

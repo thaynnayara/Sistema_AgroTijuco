@@ -21,18 +21,27 @@ public class PropriedadeService {
     private ProdutorRepository produtorRepository;
 
     public List<Propriedade> listarTodas() {
-        return propriedadeRepository.findAll();
+        List<Propriedade> list = propriedadeRepository.findAllGlobal();
+        if (list.isEmpty()) {
+            return propriedadeRepository.findAll();
+        }
+        return list;
     }
 
     public List<Propriedade> listarPorProdutor(UUID produtorId) {
-        return propriedadeRepository.findByProdutorId(produtorId);
+        List<Propriedade> list = propriedadeRepository.findByProdutorIdGlobal(produtorId);
+        if (list.isEmpty()) {
+            return propriedadeRepository.findByProdutorId(produtorId);
+        }
+        return list;
     }
 
     @Transactional
     public Propriedade cadastrar(Propriedade propriedade, UUID produtorId) {
         // Regra 1: O Produtor precisa existir no banco (atribuído pela gestora)
-        Produtor produtor = produtorRepository.findById(produtorId)
-                .orElseThrow(() -> new RuntimeException("Não é possível cadastrar a propriedade. Produtor não encontrado."));
+        Produtor produtor = produtorRepository.findByIdIgnoringTenant(produtorId)
+                .orElseGet(() -> produtorRepository.findById(produtorId)
+                        .orElseThrow(() -> new RuntimeException("Não é possível cadastrar a propriedade. Produtor não encontrado.")));
 
         // Normalização de campos para não violar restrições NOT NULL
         if (propriedade.getNomeFazenda() == null || propriedade.getNomeFazenda().isBlank()) {
@@ -55,25 +64,30 @@ public class PropriedadeService {
             propriedade.setAreaHectares(10.0);
         }
 
+        if (propriedade.getTenantId() == null || propriedade.getTenantId().isBlank()) {
+            propriedade.setTenantId(produtor.getTenantId() != null && !produtor.getTenantId().isBlank() ? produtor.getTenantId() : "Fazenda AgroTijuco");
+        }
+
         propriedade.setProdutor(produtor);
         return propriedadeRepository.save(propriedade);
     }
 
     @Transactional
     public Propriedade atribuirProdutor(UUID propriedadeId, UUID novoProdutorId) {
-        Propriedade propriedade = propriedadeRepository.findById(propriedadeId)
-                .orElseThrow(() -> new RuntimeException("Propriedade não encontrada."));
+        Propriedade propriedade = buscarPorId(propriedadeId);
 
-        Produtor novoProdutor = produtorRepository.findById(novoProdutorId)
-                .orElseThrow(() -> new RuntimeException("Produtor não encontrado para atribuição."));
+        Produtor novoProdutor = produtorRepository.findByIdIgnoringTenant(novoProdutorId)
+                .orElseGet(() -> produtorRepository.findById(novoProdutorId)
+                        .orElseThrow(() -> new RuntimeException("Produtor não encontrado para atribuição.")));
 
         propriedade.setProdutor(novoProdutor);
         return propriedadeRepository.save(propriedade);
     }
 
     public Propriedade buscarPorId(UUID id) {
-        return propriedadeRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Propriedade não encontrada com ID: " + id));
+        return propriedadeRepository.findByIdIgnoringTenant(id)
+                .orElseGet(() -> propriedadeRepository.findById(id)
+                        .orElseThrow(() -> new RuntimeException("Propriedade não encontrada com ID: " + id)));
     }
 
     @Transactional
@@ -104,9 +118,7 @@ public class PropriedadeService {
 
     @Transactional
     public void deletar(UUID id) {
-        if (!propriedadeRepository.existsById(id)) {
-            throw new RuntimeException("Propriedade não encontrada com ID: " + id);
-        }
-        propriedadeRepository.deleteById(id);
+        Propriedade prop = buscarPorId(id);
+        propriedadeRepository.delete(prop);
     }
 }

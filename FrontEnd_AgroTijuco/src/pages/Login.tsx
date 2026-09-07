@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useAuth } from '../contexts/AuthContext';
-import { Sprout, Lock, Mail, Loader2, ArrowRight, UserPlus, Building2, UserCheck, ShieldCheck } from 'lucide-react';
+import { Sprout, Lock, Mail, Loader2, ArrowRight, UserPlus, UserCheck, ShieldCheck } from 'lucide-react';
 
 const loginSchema = z.object({
   email: z.string().min(1, 'E-mail é obrigatório').email('Digite um e-mail válido'),
@@ -14,7 +14,6 @@ const loginSchema = z.object({
 
 const registerSchema = z.object({
   nome: z.string().min(3, 'Nome completo deve ter no mínimo 3 caracteres'),
-  tenantId: z.string().min(3, 'Informe o nome da sua fazenda ou propriedade'),
   email: z.string().min(1, 'E-mail é obrigatório').email('Digite um e-mail válido'),
   senha: z.string().min(8, 'A senha deve ter no mínimo 8 caracteres'),
   confirmarSenha: z.string().min(8, 'Confirmação de senha obrigatória'),
@@ -58,7 +57,6 @@ export const Login: React.FC = () => {
     resolver: zodResolver(registerSchema),
     defaultValues: {
       nome: '',
-      tenantId: '',
       email: '',
       senha: '',
       confirmarSenha: '',
@@ -101,7 +99,7 @@ export const Login: React.FC = () => {
           nome: data.nome,
           email: data.email,
           senha: data.senha,
-          tenantId: data.tenantId,
+          tenantId: 'Fazenda AgroTijuco',
           role: 'PRODUTOR',
         },
         true
@@ -285,25 +283,6 @@ export const Login: React.FC = () => {
                 )}
               </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                  Nome da Fazenda / Propriedade
-                </label>
-                <div className="relative rounded-xl shadow-xs">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                    <Building2 className="h-5 w-5 text-agro-primary/70" />
-                  </div>
-                  <input
-                    type="text"
-                    {...registerSignUpField('tenantId')}
-                    className="block w-full pl-10 pr-3 py-2.5 bg-slate-50 border border-slate-200 focus:border-agro-primary focus:ring-agro-primary rounded-xl focus:outline-none focus:ring-2 focus:bg-white text-sm text-slate-900 transition-colors"
-                    placeholder="Ex: Fazenda Santa Luzia"
-                  />
-                </div>
-                {registerErrors.tenantId && (
-                  <p className="mt-1 text-xs text-red-500">{registerErrors.tenantId.message}</p>
-                )}
-              </div>
 
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">

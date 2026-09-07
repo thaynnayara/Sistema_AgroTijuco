@@ -5,8 +5,6 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.MappedSuperclass;
-import org.hibernate.annotations.TenantId;
-
 import java.util.UUID;
 
 @MappedSuperclass
@@ -16,9 +14,8 @@ public abstract class BaseEntity {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @TenantId
     @Column(name = "tenant_id", nullable = false, updatable = false, length = 64)
-    private String tenantId;
+    private String tenantId = "Fazenda AgroTijuco";
 
     public UUID getId() {
         return id;

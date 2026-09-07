@@ -3,6 +3,8 @@ package com.agrotijuco.sistema.service;
 import com.agrotijuco.sistema.dto.UsuarioDTO;
 import com.agrotijuco.sistema.model.Role;
 import com.agrotijuco.sistema.model.Usuario;
+import com.agrotijuco.sistema.model.Produtor;
+import com.agrotijuco.sistema.repository.ProdutorRepository;
 import com.agrotijuco.sistema.repository.UsuarioRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,9 +17,11 @@ import java.util.stream.Collectors;
 public class UsuarioService {
 
     private final UsuarioRepository usuarioRepository;
+    private final ProdutorRepository produtorRepository;
 
-    public UsuarioService(UsuarioRepository usuarioRepository) {
+    public UsuarioService(UsuarioRepository usuarioRepository, ProdutorRepository produtorRepository) {
         this.usuarioRepository = usuarioRepository;
+        this.produtorRepository = produtorRepository;
     }
 
     public List<UsuarioDTO> listarTodos() {
@@ -46,6 +50,22 @@ public class UsuarioService {
         Usuario usuario = usuarioRepository.findByIdIgnoringTenant(id)
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado com ID: " + id));
         usuario.setRole(role);
+
+        if (role == Role.PRODUTOR && usuario.getProdutorId() == null) {
+            Produtor produtor = produtorRepository.findByEmailIgnoringTenant(usuario.getEmail())
+                    .orElseGet(() -> {
+                        Produtor p = new Produtor(
+                                usuario.getNome(),
+                                "CPF-" + UUID.randomUUID().toString().substring(0, 8),
+                                usuario.getEmail(),
+                                ""
+                        );
+                        p.setTenantId(usuario.getTenantId() != null && !usuario.getTenantId().isBlank() ? usuario.getTenantId() : "Fazenda AgroTijuco");
+                        return produtorRepository.save(p);
+                    });
+            usuario.setProdutorId(produtor.getId());
+        }
+
         return new UsuarioDTO(usuarioRepository.save(usuario));
     }
 
