@@ -28,13 +28,21 @@ public class PesagemService {
         this.animalRepository = animalRepository;
     }
 
+    @Transactional(readOnly = true)
     public List<PesagemResponseDTO> listarTodas() {
-        List<Pesagem> pesagens = pesagemRepository.findAll();
+        List<Pesagem> pesagens = pesagemRepository.findAllWithRelations();
         return pesagens.stream().map(this::mapParaResponseDTO).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
+    public List<PesagemResponseDTO> listarPorPropriedade(UUID propriedadeId) {
+        List<Pesagem> pesagens = pesagemRepository.findByPropriedadeIdWithRelations(propriedadeId);
+        return pesagens.stream().map(this::mapParaResponseDTO).collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
     public List<PesagemResponseDTO> listarPorAnimal(UUID animalId) {
-        List<Pesagem> pesagens = pesagemRepository.findByAnimalIdOrderByDataPesagemDesc(animalId);
+        List<Pesagem> pesagens = pesagemRepository.findByAnimalIdWithAnimal(animalId);
         return pesagens.stream().map(this::mapParaResponseDTO).collect(Collectors.toList());
     }
 
@@ -67,28 +75,37 @@ public class PesagemService {
      * GMD = (Peso Atual - Peso Anterior) / Dias entre as pesagens
      */
     public PesagemResponseDTO mapParaResponseDTO(Pesagem pesagem) {
-        List<Pesagem> historico = pesagemRepository.findByAnimalIdOrderByDataPesagemDesc(pesagem.getAnimal().getId());
+        UUID animalId = null;
+        String brincoAnimal = null;
+        try {
+            if (pesagem.getAnimal() != null) {
+                animalId = pesagem.getAnimal().getId();
+                brincoAnimal = pesagem.getAnimal().getBrinco();
+            }
+        } catch (Exception ignored) {}
 
         BigDecimal gmd = null;
         Long diasEntre = null;
 
-        // Procurar a pesagem imediatamente anterior no histórico
-        int index = historico.indexOf(pesagem);
-        if (index != -1 && index + 1 < historico.size()) {
-            Pesagem anterior = historico.get(index + 1);
-            if (anterior != null && anterior.getDataPesagem() != null && pesagem.getDataPesagem() != null) {
-                diasEntre = ChronoUnit.DAYS.between(anterior.getDataPesagem(), pesagem.getDataPesagem());
-                if (diasEntre > 0) {
-                    BigDecimal diferencaPeso = pesagem.getPesoKg().subtract(anterior.getPesoKg());
-                    gmd = diferencaPeso.divide(BigDecimal.valueOf(diasEntre), 3, RoundingMode.HALF_UP);
+        if (animalId != null) {
+            List<Pesagem> historico = pesagemRepository.findByAnimalIdOrderByDataPesagemDesc(animalId);
+            int index = historico.indexOf(pesagem);
+            if (index != -1 && index + 1 < historico.size()) {
+                Pesagem anterior = historico.get(index + 1);
+                if (anterior != null && anterior.getDataPesagem() != null && pesagem.getDataPesagem() != null) {
+                    diasEntre = ChronoUnit.DAYS.between(anterior.getDataPesagem(), pesagem.getDataPesagem());
+                    if (diasEntre > 0) {
+                        BigDecimal diferencaPeso = pesagem.getPesoKg().subtract(anterior.getPesoKg());
+                        gmd = diferencaPeso.divide(BigDecimal.valueOf(diasEntre), 3, RoundingMode.HALF_UP);
+                    }
                 }
             }
         }
 
         return new PesagemResponseDTO(
                 pesagem.getId(),
-                pesagem.getAnimal().getId(),
-                pesagem.getAnimal().getBrinco(),
+                animalId,
+                brincoAnimal,
                 pesagem.getDataPesagem(),
                 pesagem.getPesoKg(),
                 gmd,

@@ -20,11 +20,20 @@ public class PesagemController {
 
     @GetMapping
     public ResponseEntity<List<PesagemResponseDTO>> listarTodas(
-            @RequestParam(required = false) UUID animalId) {
+            @RequestParam(required = false) UUID animalId,
+            @RequestParam(required = false) UUID propriedadeId) {
         if (animalId != null) {
             return ResponseEntity.ok(service.listarPorAnimal(animalId));
         }
+        if (propriedadeId != null) {
+            return ResponseEntity.ok(service.listarPorPropriedade(propriedadeId));
+        }
         return ResponseEntity.ok(service.listarTodas());
+    }
+
+    @GetMapping("/propriedade/{propriedadeId}")
+    public ResponseEntity<List<PesagemResponseDTO>> listarPorPropriedade(@PathVariable UUID propriedadeId) {
+        return ResponseEntity.ok(service.listarPorPropriedade(propriedadeId));
     }
 
     @GetMapping("/animal/{animalId}")

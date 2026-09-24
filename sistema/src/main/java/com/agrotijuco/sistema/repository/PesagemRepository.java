@@ -17,6 +17,15 @@ public interface PesagemRepository extends JpaRepository<Pesagem, UUID> {
 
     List<Pesagem> findByAnimalIdOrderByDataPesagemDesc(UUID animalId);
 
+    @Query("SELECT p FROM Pesagem p LEFT JOIN FETCH p.animal WHERE p.animal.id = :animalId ORDER BY p.dataPesagem DESC")
+    List<Pesagem> findByAnimalIdWithAnimal(@Param("animalId") UUID animalId);
+
+    @Query("SELECT p FROM Pesagem p LEFT JOIN FETCH p.animal ORDER BY p.dataPesagem DESC")
+    List<Pesagem> findAllWithRelations();
+
+    @Query("SELECT p FROM Pesagem p LEFT JOIN FETCH p.animal WHERE p.animal.propriedade.id = :propriedadeId ORDER BY p.dataPesagem DESC")
+    List<Pesagem> findByPropriedadeIdWithRelations(@Param("propriedadeId") UUID propriedadeId);
+
     // Standard Pageable pagination
     Page<Pesagem> findByAnimalId(UUID animalId, Pageable pageable);
 

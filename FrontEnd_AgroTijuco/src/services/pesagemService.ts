@@ -3,9 +3,14 @@ import type { Pesagem } from '../types';
 import { offlineSyncService } from './offlineSyncService';
 
 export const pesagemService = {
-  async listarTodas(animalId?: string): Promise<Pesagem[]> {
+  async listarTodas(animalId?: string, propriedadeId?: string): Promise<Pesagem[]> {
     try {
-      const url = animalId ? `/pesagens/animal/${animalId}` : '/pesagens';
+      let url = '/pesagens';
+      if (animalId) {
+        url = `/pesagens/animal/${animalId}`;
+      } else if (propriedadeId) {
+        url = `/pesagens/propriedade/${propriedadeId}`;
+      }
       const response = await api.get<Pesagem[]>(url);
       return response.data;
     } catch (err) {
