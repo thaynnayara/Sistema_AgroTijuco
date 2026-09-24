@@ -70,6 +70,36 @@ public class PesagemService {
         return mapParaResponseDTO(salva);
     }
 
+    @Transactional
+    public PesagemResponseDTO atualizar(UUID id, PesagemRequestDTO dto) {
+        Pesagem pesagem = pesagemRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Pesagem não encontrada com o ID: " + id));
+
+        if (dto.dataPesagem() != null && dto.dataPesagem().isAfter(LocalDate.now())) {
+            throw new IllegalArgumentException("A data da pesagem não pode ser uma data futura.");
+        }
+
+        if (dto.pesoKg() == null || dto.pesoKg().signum() <= 0) {
+            throw new IllegalArgumentException("O peso registrado deve ser maior que zero.");
+        }
+
+        if (dto.dataPesagem() != null) {
+            pesagem.setDataPesagem(dto.dataPesagem());
+        }
+        pesagem.setPesoKg(dto.pesoKg());
+        pesagem.setObservacao(dto.observacao());
+
+        Pesagem salva = pesagemRepository.save(pesagem);
+        return mapParaResponseDTO(salva);
+    }
+
+    @Transactional
+    public void excluir(UUID id) {
+        Pesagem pesagem = pesagemRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Pesagem não encontrada com o ID: " + id));
+        pesagemRepository.delete(pesagem);
+    }
+
     /**
      * RN01 - Cálculo do GMD (Ganho Médio Diário):
      * GMD = (Peso Atual - Peso Anterior) / Dias entre as pesagens
@@ -89,7 +119,14 @@ public class PesagemService {
 
         if (animalId != null) {
             List<Pesagem> historico = pesagemRepository.findByAnimalIdOrderByDataPesagemDesc(animalId);
-            int index = historico.indexOf(pesagem);
+            int index = -1;
+            for (int i = 0; i < historico.size(); i++) {
+                if (pesagem.getId() != null && pesagem.getId().equals(historico.get(i).getId())) {
+                    index = i;
+                    break;
+                }
+            }
+
             if (index != -1 && index + 1 < historico.size()) {
                 Pesagem anterior = historico.get(index + 1);
                 if (anterior != null && anterior.getDataPesagem() != null && pesagem.getDataPesagem() != null) {

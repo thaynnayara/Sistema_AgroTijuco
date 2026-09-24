@@ -49,4 +49,18 @@ public class PesagemController {
         PesagemResponseDTO resposta = service.registrarPesagem(dto, animalId);
         return ResponseEntity.status(HttpStatus.CREATED).body(resposta);
     }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<PesagemResponseDTO> atualizar(
+            @PathVariable UUID id,
+            @RequestBody PesagemRequestDTO dto) {
+        PesagemResponseDTO atualizado = service.atualizar(id, dto);
+        return ResponseEntity.ok(atualizado);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> excluir(@PathVariable UUID id) {
+        service.excluir(id);
+        return ResponseEntity.noContent().build();
+    }
 }

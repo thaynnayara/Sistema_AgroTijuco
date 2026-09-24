@@ -35,5 +35,14 @@ export const pesagemService = {
     }
     const response = await api.post<Pesagem>(`/pesagens/animal/${animalId}`, pesagem);
     return response.data;
+  },
+
+  async atualizar(id: string, pesagem: { dataPesagem: string; pesoKg: number; observacao?: string }): Promise<Pesagem> {
+    const response = await api.put<Pesagem>(`/pesagens/${id}`, pesagem);
+    return response.data;
+  },
+
+  async excluir(id: string): Promise<void> {
+    await api.delete(`/pesagens/${id}`);
   }
 };
