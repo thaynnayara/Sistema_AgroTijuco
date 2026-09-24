@@ -14,6 +14,9 @@ public class UsuarioDTO {
     private Role role;
     private String tenantId;
     private UUID produtorId;
+    private String produtorNome;
+    private String produtorCpfCnpj;
+    private java.util.List<String> fazendas = new java.util.ArrayList<>();
     private boolean ativo;
     private LocalDateTime createdAt;
 
@@ -87,6 +90,30 @@ public class UsuarioDTO {
 
     public void setProdutorId(UUID produtorId) {
         this.produtorId = produtorId;
+    }
+
+    public String getProdutorNome() {
+        return produtorNome;
+    }
+
+    public void setProdutorNome(String produtorNome) {
+        this.produtorNome = produtorNome;
+    }
+
+    public String getProdutorCpfCnpj() {
+        return produtorCpfCnpj;
+    }
+
+    public void setProdutorCpfCnpj(String produtorCpfCnpj) {
+        this.produtorCpfCnpj = produtorCpfCnpj;
+    }
+
+    public java.util.List<String> getFazendas() {
+        return fazendas;
+    }
+
+    public void setFazendas(java.util.List<String> fazendas) {
+        this.fazendas = fazendas;
     }
 
     public boolean isAtivo() {

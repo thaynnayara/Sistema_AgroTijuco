@@ -13,7 +13,7 @@ interface FarmContextData {
   setSelectedFarm: (farm: Propriedade | null) => void;
   selectFarmById: (id: string) => void;
   atualizarFazenda: (id: string, dados: Partial<Propriedade>) => Promise<Propriedade>;
-  cadastrarFazenda: (dados: CreatePropriedadeInput, produtorId?: string) => Promise<Propriedade>;
+  cadastrarFazenda: (dados: CreatePropriedadeInput, produtorIds?: string | string[]) => Promise<Propriedade>;
   recarregarFazendas: () => Promise<void>;
   loadingFarms: boolean;
 }
@@ -27,10 +27,7 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed)) {
-          // Purga resquícios de mocks antigos de Walter Barreto
-          return parsed.filter((p: Propriedade) => 
-            !p.produtorNome?.includes('Walter Barreto')
-          );
+          return parsed;
         }
       } catch {}
     }
@@ -63,11 +60,13 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoadingFarms(true);
     try {
       const data = await propriedadeService.listarTodas();
-      if (Array.isArray(data)) {
+      if (Array.isArray(data) && data.length > 0) {
         const formatadas = data.map((p) => ({
           ...p,
           nome: p.nomeFazenda || p.nome || 'Fazenda sem nome',
           localizacao: p.municipio || p.localizacao || 'Localização não informada',
+          produtoresIds: p.produtoresIds || (p.produtorId ? [p.produtorId] : []),
+          produtorNomes: p.produtorNomes || (p.produtorNome ? [p.produtorNome] : []),
         }));
         setPropriedades(formatadas);
         localStorage.setItem(FARMS_CACHE_KEY, JSON.stringify(formatadas));
@@ -91,9 +90,7 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed)) {
-          farms = parsed.filter((p: Propriedade) => 
-            !p.produtorNome?.includes('Walter Barreto')
-          );
+          farms = parsed;
         }
       } catch {}
     }
@@ -109,6 +106,9 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const atualizarFazenda = async (id: string, dados: Partial<Propriedade>): Promise<Propriedade> => {
     try {
+      if (dados.produtoresIds && dados.produtoresIds.length > 0) {
+        await propriedadeService.atribuirProdutores(id, dados.produtoresIds);
+      }
       await propriedadeService.atualizarPropriedade(id, dados);
     } catch (e) {
       console.warn('Erro ao atualizar fazenda no backend, salvando no estado local:', e);
@@ -116,13 +116,17 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const atualizadas = propriedades.map((p) => {
       if (p.id === id) {
-        const nova = {
+        const nova: Propriedade = {
           ...p,
           ...dados,
           nome: dados.nome || dados.nomeFazenda || p.nome,
           nomeFazenda: dados.nomeFazenda || dados.nome || p.nomeFazenda,
           municipio: dados.municipio || dados.localizacao || p.municipio,
           localizacao: dados.localizacao || dados.municipio || p.localizacao,
+          produtoresIds: dados.produtoresIds || p.produtoresIds,
+          produtorNomes: dados.produtorNomes || p.produtorNomes,
+          produtorNome: dados.produtorNome || p.produtorNome,
+          produtorId: dados.produtorId || p.produtorId,
         };
         return nova;
       }
@@ -141,11 +145,19 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const cadastrarFazenda = async (
     dados: CreatePropriedadeInput,
-    produtorId?: string
+    produtorIds?: string | string[]
   ): Promise<Propriedade> => {
+    const idsList = Array.isArray(produtorIds) 
+      ? produtorIds 
+      : (produtorIds ? [produtorIds] : (dados.produtoresIds || (dados.produtorId ? [dados.produtorId] : [])));
+
     let criada: Propriedade;
     try {
-      criada = await propriedadeService.criarParaProdutor(produtorId, dados);
+      if (idsList.length > 0) {
+        criada = await propriedadeService.criarParaProdutores(idsList, dados);
+      } else {
+        criada = await propriedadeService.criarParaProdutor(undefined, dados);
+      }
     } catch {
       criada = {
         ...dados,
@@ -154,7 +166,8 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
         nomeFazenda: dados.nome,
         municipio: dados.localizacao,
         localizacao: dados.localizacao,
-        produtorId: produtorId || undefined,
+        produtorId: idsList[0] || undefined,
+        produtoresIds: idsList,
       };
     }
 
@@ -165,10 +178,13 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
       nomeFazenda: criada.nomeFazenda || dados.nome,
       municipio: criada.municipio || dados.localizacao,
       localizacao: criada.localizacao || dados.localizacao,
-      produtorId: produtorId || criada.produtorId,
+      produtorId: criada.produtorId || idsList[0],
+      produtoresIds: criada.produtoresIds && criada.produtoresIds.length > 0 ? criada.produtoresIds : idsList,
+      produtorNomes: criada.produtorNomes || (criada.produtorNome ? [criada.produtorNome] : []),
+      produtorNome: criada.produtorNome,
     };
 
-    const lista = [formatada, ...propriedades];
+    const lista = [formatada, ...propriedades.filter(p => p.id !== formatada.id)];
     setPropriedades(lista);
     localStorage.setItem(FARMS_CACHE_KEY, JSON.stringify(lista));
     setSelectedFarm(formatada);

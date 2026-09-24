@@ -7,6 +7,7 @@ export interface RegisterCredentials {
   senha: string;
   tenantId: string;
   role?: 'GESTOR' | 'ADMIN' | 'PRODUTOR' | 'OPERADOR';
+  produtorId?: string;
 }
 
 function processAuthResponse(data: any, rememberMe: boolean): AuthResponse {

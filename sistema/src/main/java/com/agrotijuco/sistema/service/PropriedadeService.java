@@ -23,20 +23,70 @@ public class PropriedadeService {
     @Autowired
     private com.agrotijuco.sistema.repository.UsuarioRepository usuarioRepository;
 
+    @Transactional(readOnly = true)
     public List<Propriedade> listarTodas() {
         List<Propriedade> list = propriedadeRepository.findAllGlobal();
         if (list.isEmpty()) {
-            return propriedadeRepository.findAll();
+            list = propriedadeRepository.findAll();
+        }
+        for (Propriedade p : list) {
+            try {
+                if (p.getProdutor() != null) {
+                    p.getProdutor().getNome();
+                }
+            } catch (Exception ignored) {
+                p.setProdutor(null);
+            }
+            try {
+                if (p.getProdutores() != null) {
+                    p.getProdutores().size();
+                }
+            } catch (Exception ignored) {}
         }
         return list;
     }
 
+    @Transactional(readOnly = true)
     public List<Propriedade> listarPorProdutor(UUID produtorId) {
         List<Propriedade> list = propriedadeRepository.findByProdutorIdGlobal(produtorId);
         if (list.isEmpty()) {
-            return propriedadeRepository.findByProdutorId(produtorId);
+            list = propriedadeRepository.findByProdutorId(produtorId);
+        }
+        for (Propriedade p : list) {
+            try {
+                if (p.getProdutor() != null) {
+                    p.getProdutor().getNome();
+                }
+            } catch (Exception ignored) {
+                p.setProdutor(null);
+            }
+            try {
+                if (p.getProdutores() != null) {
+                    p.getProdutores().size();
+                }
+            } catch (Exception ignored) {}
         }
         return list;
+    }
+
+    public java.util.Set<Produtor> resolverProdutores(List<UUID> produtorIds) {
+        java.util.Set<Produtor> resultado = new java.util.LinkedHashSet<>();
+        if (produtorIds == null || produtorIds.isEmpty()) {
+            return resultado;
+        }
+        for (UUID pid : produtorIds) {
+            if (pid != null) {
+                try {
+                    Produtor p = resolverProdutor(pid);
+                    if (p != null) {
+                        resultado.add(p);
+                    }
+                } catch (Exception e) {
+                    // Log e ignora ID inválido
+                }
+            }
+        }
+        return resultado;
     }
 
     private Produtor resolverProdutor(UUID produtorId) {
@@ -90,12 +140,20 @@ public class PropriedadeService {
             return novo;
         }
 
-        throw new RuntimeException("Não é possível cadastrar a propriedade. Produtor não encontrado com o ID informado.");
+        throw new RuntimeException("Não é possível cadastrar a propriedade. Produtor não encontrado com o ID informado: " + produtorId);
     }
 
     @Transactional
-    public Propriedade cadastrar(Propriedade propriedade, UUID produtorId) {
-        Produtor produtor = resolverProdutor(produtorId);
+    public Propriedade cadastrar(Propriedade propriedade, List<UUID> produtorIds) {
+        java.util.Set<Produtor> prods = resolverProdutores(produtorIds);
+
+        // Se produtorIds foi vazio mas a propriedade já tem produtor/produtores
+        if (prods.isEmpty() && propriedade.getProdutor() != null) {
+            prods.add(propriedade.getProdutor());
+        }
+        if (prods.isEmpty() && propriedade.getProdutores() != null && !propriedade.getProdutores().isEmpty()) {
+            prods.addAll(propriedade.getProdutores());
+        }
 
         // Normalização de campos para não violar restrições NOT NULL
         if (propriedade.getNomeFazenda() == null || propriedade.getNomeFazenda().isBlank()) {
@@ -118,24 +176,46 @@ public class PropriedadeService {
             propriedade.setAreaHectares(10.0);
         }
 
+        Produtor produtorPrincipal = !prods.isEmpty() ? prods.iterator().next() : null;
+
         if (propriedade.getTenantId() == null || propriedade.getTenantId().isBlank()) {
-            String tId = (produtor != null && produtor.getTenantId() != null && !produtor.getTenantId().isBlank())
-                    ? produtor.getTenantId()
+            String tId = (produtorPrincipal != null && produtorPrincipal.getTenantId() != null && !produtorPrincipal.getTenantId().isBlank())
+                    ? produtorPrincipal.getTenantId()
                     : "Fazenda AgroTijuco";
             propriedade.setTenantId(tId);
         }
 
-        propriedade.setProdutor(produtor);
+        propriedade.setProdutor(produtorPrincipal);
+        propriedade.setProdutores(prods);
+        return propriedadeRepository.save(propriedade);
+    }
+
+    @Transactional
+    public Propriedade cadastrar(Propriedade propriedade, UUID produtorId) {
+        List<UUID> ids = produtorId != null ? List.of(produtorId) : java.util.Collections.emptyList();
+        return cadastrar(propriedade, ids);
+    }
+
+    @Transactional
+    public Propriedade atribuirProdutores(UUID propriedadeId, List<UUID> novosProdutorIds) {
+        Propriedade propriedade = buscarPorId(propriedadeId);
+        java.util.Set<Produtor> novos = resolverProdutores(novosProdutorIds);
+
+        propriedade.setProdutores(novos);
+        if (!novos.isEmpty()) {
+            propriedade.setProdutor(novos.iterator().next());
+        } else {
+            propriedade.setProdutor(null);
+        }
         return propriedadeRepository.save(propriedade);
     }
 
     @Transactional
     public Propriedade atribuirProdutor(UUID propriedadeId, UUID novoProdutorId) {
-        Propriedade propriedade = buscarPorId(propriedadeId);
-        Produtor novoProdutor = resolverProdutor(novoProdutorId);
-
-        propriedade.setProdutor(novoProdutor);
-        return propriedadeRepository.save(propriedade);
+        if (novoProdutorId == null) {
+            return atribuirProdutores(propriedadeId, java.util.Collections.emptyList());
+        }
+        return atribuirProdutores(propriedadeId, List.of(novoProdutorId));
     }
 
     public Propriedade buscarPorId(UUID id) {
@@ -165,6 +245,16 @@ public class PropriedadeService {
 
         if (dadosAtualizados.getInscricaoEstadual() != null) {
             propriedade.setInscricaoEstadual(dadosAtualizados.getInscricaoEstadual());
+        }
+
+        if (dadosAtualizados.getProdutorIdsInput() != null) {
+            java.util.Set<Produtor> novos = resolverProdutores(dadosAtualizados.getProdutorIdsInput());
+            propriedade.setProdutores(novos);
+            if (!novos.isEmpty()) {
+                propriedade.setProdutor(novos.iterator().next());
+            } else {
+                propriedade.setProdutor(null);
+            }
         }
 
         return propriedadeRepository.save(propriedade);

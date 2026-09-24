@@ -18,10 +18,54 @@ public class UsuarioService {
 
     private final UsuarioRepository usuarioRepository;
     private final ProdutorRepository produtorRepository;
+    private final com.agrotijuco.sistema.repository.PropriedadeRepository propriedadeRepository;
 
-    public UsuarioService(UsuarioRepository usuarioRepository, ProdutorRepository produtorRepository) {
+    public UsuarioService(UsuarioRepository usuarioRepository,
+                          ProdutorRepository produtorRepository,
+                          com.agrotijuco.sistema.repository.PropriedadeRepository propriedadeRepository) {
         this.usuarioRepository = usuarioRepository;
         this.produtorRepository = produtorRepository;
+        this.propriedadeRepository = propriedadeRepository;
+    }
+
+    public UsuarioDTO montarUsuarioDTO(Usuario usuario) {
+        UsuarioDTO dto = new UsuarioDTO(usuario);
+        if (usuario.getProdutorId() != null) {
+            produtorRepository.findByIdIgnoringTenant(usuario.getProdutorId()).ifPresent(p -> {
+                dto.setProdutorNome(p.getNome());
+                dto.setProdutorCpfCnpj(p.getCpfOuCnpj());
+            });
+            try {
+                var props = propriedadeRepository.findByProdutorIdGlobal(usuario.getProdutorId());
+                dto.setFazendas(props.stream()
+                        .map(com.agrotijuco.sistema.model.Propriedade::getNomeFazenda)
+                        .filter(n -> n != null && !n.isBlank())
+                        .distinct()
+                        .collect(Collectors.toList()));
+            } catch (Exception e) {
+                // ignore
+            }
+        } else if (usuario.getRole() == Role.PRODUTOR) {
+            // Tenta localizar produtor correspondente por email
+            produtorRepository.findByEmailIgnoringTenant(usuario.getEmail()).ifPresent(p -> {
+                usuario.setProdutorId(p.getId());
+                usuarioRepository.save(usuario);
+                dto.setProdutorId(p.getId());
+                dto.setProdutorNome(p.getNome());
+                dto.setProdutorCpfCnpj(p.getCpfOuCnpj());
+                try {
+                    var props = propriedadeRepository.findByProdutorIdGlobal(p.getId());
+                    dto.setFazendas(props.stream()
+                            .map(com.agrotijuco.sistema.model.Propriedade::getNomeFazenda)
+                            .filter(n -> n != null && !n.isBlank())
+                            .distinct()
+                            .collect(Collectors.toList()));
+                } catch (Exception e) {
+                    // ignore
+                }
+            });
+        }
+        return dto;
     }
 
     public List<UsuarioDTO> listarTodos() {
@@ -35,14 +79,14 @@ public class UsuarioService {
             list = usuarioRepository.findAll();
         }
         return list.stream()
-                .map(UsuarioDTO::new)
+                .map(this::montarUsuarioDTO)
                 .collect(Collectors.toList());
     }
 
     public UsuarioDTO buscarPorId(UUID id) {
         Usuario usuario = usuarioRepository.findByIdIgnoringTenant(id)
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado com ID: " + id));
-        return new UsuarioDTO(usuario);
+        return montarUsuarioDTO(usuario);
     }
 
     @Transactional
@@ -50,7 +94,22 @@ public class UsuarioService {
         Usuario usuario = usuarioRepository.findByIdIgnoringTenant(id)
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado com ID: " + id));
         usuario.setAtivo(ativo);
-        return new UsuarioDTO(usuarioRepository.save(usuario));
+        return montarUsuarioDTO(usuarioRepository.save(usuario));
+    }
+
+    @Transactional
+    public UsuarioDTO vincularProdutor(UUID usuarioId, UUID produtorId) {
+        Usuario usuario = usuarioRepository.findByIdIgnoringTenant(usuarioId)
+                .orElseThrow(() -> new RuntimeException("Usuário não encontrado com ID: " + usuarioId));
+        if (produtorId != null) {
+            Produtor p = produtorRepository.findByIdIgnoringTenant(produtorId)
+                    .orElseThrow(() -> new RuntimeException("Produtor não encontrado com ID: " + produtorId));
+            usuario.setProdutorId(p.getId());
+            usuario.setRole(Role.PRODUTOR);
+        } else {
+            usuario.setProdutorId(null);
+        }
+        return montarUsuarioDTO(usuarioRepository.save(usuario));
     }
 
     @Transactional
@@ -74,7 +133,7 @@ public class UsuarioService {
             usuario.setProdutorId(produtor.getId());
         }
 
-        return new UsuarioDTO(usuarioRepository.save(usuario));
+        return montarUsuarioDTO(usuarioRepository.save(usuario));
     }
 
     @Transactional

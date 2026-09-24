@@ -3,6 +3,12 @@ package com.agrotijuco.sistema.controller;
 import com.agrotijuco.sistema.dto.UsuarioDTO;
 import com.agrotijuco.sistema.model.Role;
 import com.agrotijuco.sistema.service.UsuarioService;
+import com.agrotijuco.sistema.dto.auth.RegisterRequestDTO;
+import com.agrotijuco.sistema.model.Usuario;
+import com.agrotijuco.sistema.repository.UsuarioRepository;
+import com.agrotijuco.sistema.service.AuthService;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -16,9 +22,26 @@ import java.util.UUID;
 public class UsuarioController {
 
     private final UsuarioService usuarioService;
+    private final AuthService authService;
+    private final UsuarioRepository usuarioRepository;
 
-    public UsuarioController(UsuarioService usuarioService) {
+    public UsuarioController(UsuarioService usuarioService, AuthService authService, UsuarioRepository usuarioRepository) {
         this.usuarioService = usuarioService;
+        this.authService = authService;
+        this.usuarioRepository = usuarioRepository;
+    }
+
+    @PostMapping
+    public ResponseEntity<UsuarioDTO> cadastrar(@RequestBody @Valid RegisterRequestDTO dto) {
+        authService.register(dto);
+        Usuario usuario = usuarioRepository.findByEmailIgnoringTenant(dto.getEmail().trim().toLowerCase())
+                .orElseThrow(() -> new RuntimeException("Erro ao recuperar usuário cadastrado"));
+        return ResponseEntity.status(HttpStatus.CREATED).body(usuarioService.montarUsuarioDTO(usuario));
+    }
+
+    @PatchMapping("/{id}/produtor")
+    public ResponseEntity<UsuarioDTO> vincularProdutor(@PathVariable UUID id, @RequestParam(required = false) UUID produtorId) {
+        return ResponseEntity.ok(usuarioService.vincularProdutor(id, produtorId));
     }
 
     @GetMapping

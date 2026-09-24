@@ -148,11 +148,17 @@ export const DashboardLayout: React.FC = () => {
                 className="bg-transparent text-white text-xs font-bold focus:outline-none cursor-pointer pr-1 truncate max-w-[210px]"
                 title="Selecione a fazenda para auditoria e gestão"
               >
-                {propriedades.map((p) => (
-                  <option key={p.id} value={p.id} className="text-slate-900 font-medium">
-                    {p.nome || p.nomeFazenda} ({p.areaHectares} ha)
+                {propriedades.length === 0 ? (
+                  <option value="" disabled className="text-slate-500 font-normal">
+                    Nenhuma fazenda cadastrada
                   </option>
-                ))}
+                ) : (
+                  propriedades.map((p) => (
+                    <option key={p.id} value={p.id} className="text-slate-900 font-medium">
+                      {p.nome || p.nomeFazenda} ({p.areaHectares} ha)
+                    </option>
+                  ))
+                )}
               </select>
             </div>
           </div>
@@ -286,6 +292,32 @@ export const DashboardLayout: React.FC = () => {
               </div>
 
               <div className="flex-1 overflow-y-auto p-4">
+                {/* Seletor Mobile de Fazenda Ativa */}
+                <div className="mb-4 p-3 bg-slate-50 border border-slate-200 rounded-2xl">
+                  <div className="text-[10px] uppercase font-bold text-slate-500 mb-1.5 flex items-center">
+                    <Home className="w-3.5 h-3.5 text-agro-primary mr-1" />
+                    Fazenda Selecionada
+                  </div>
+                  <select
+                    value={selectedFarm?.id || ''}
+                    onChange={(e) => {
+                      selectFarmById(e.target.value);
+                      setMobileOpen(false);
+                    }}
+                    className="w-full bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 p-2.5 focus:outline-none focus:ring-2 focus:ring-agro-primary"
+                  >
+                    {propriedades.length === 0 ? (
+                      <option value="" disabled>Nenhuma fazenda cadastrada</option>
+                    ) : (
+                      propriedades.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.nome || p.nomeFazenda} ({p.areaHectares} ha)
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
+
                 <nav className="space-y-1">
                   {navItems.map((item) => {
                     const Icon = item.icon;

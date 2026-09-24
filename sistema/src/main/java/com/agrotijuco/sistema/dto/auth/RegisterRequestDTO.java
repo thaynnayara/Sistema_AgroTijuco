@@ -23,6 +23,8 @@ public class RegisterRequestDTO {
 
     private Role role = Role.PRODUTOR;
 
+    private java.util.UUID produtorId;
+
     public RegisterRequestDTO() {}
 
     public RegisterRequestDTO(String nome, String email, String senha, String tenantId, Role role) {
@@ -71,5 +73,13 @@ public class RegisterRequestDTO {
 
     public void setRole(Role role) {
         this.role = role;
+    }
+
+    public java.util.UUID getProdutorId() {
+        return produtorId;
+    }
+
+    public void setProdutorId(java.util.UUID produtorId) {
+        this.produtorId = produtorId;
     }
 }

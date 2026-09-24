@@ -10,6 +10,8 @@ export interface User {
   tenantId: string; // Multi-tenancy isolation key
   produtorId?: string; // UUID do produtor
   produtorNome?: string;
+  produtorCpfCnpj?: string;
+  fazendas?: string[];
   ativo?: boolean;
   createdAt?: string;
 }
@@ -41,7 +43,7 @@ export interface Produtor {
 export type CreateProdutorInput = Omit<Produtor, 'id' | 'dataCriacao' | 'totalPropriedades'>;
 
 /**
- * Entidade Propriedade (UUID) vinculada a um Produtor
+ * Entidade Propriedade (UUID) vinculada a Produtores
  */
 export interface Propriedade {
   id?: string;
@@ -53,10 +55,17 @@ export interface Propriedade {
   localizacao?: string;
   produtorId?: string;
   produtorNome?: string;
+  produtoresIds?: string[];
+  produtorNomes?: string[];
+  produtores?: Produtor[];
   totalAnimais?: number;
 }
 
-export type CreatePropriedadeInput = Omit<Propriedade, 'id' | 'produtorId' | 'produtorNome' | 'totalAnimais'>;
+export type CreatePropriedadeInput = Omit<Propriedade, 'id' | 'totalAnimais' | 'produtores'> & {
+  produtorId?: string;
+  produtorIds?: string[];
+  produtoresIds?: string[];
+};
 
 /**
  * RF01 & RF05 - Entidade Animal (UUID)

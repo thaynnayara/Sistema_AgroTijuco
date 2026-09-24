@@ -51,15 +51,20 @@ public class AuthService {
             usuario.setRole(dto.getRole() != null ? dto.getRole() : com.agrotijuco.sistema.model.Role.PRODUTOR);
             usuario.setAtivo(true);
 
-            if (usuario.getRole() == com.agrotijuco.sistema.model.Role.PRODUTOR) {
-                com.agrotijuco.sistema.model.Produtor produtor = new com.agrotijuco.sistema.model.Produtor(
-                        usuario.getNome(),
-                        "CPF-" + java.util.UUID.randomUUID().toString().substring(0, 8),
-                        usuario.getEmail(),
-                        ""
-                );
-                produtor.setTenantId(tenant);
-                produtor = produtorRepository.save(produtor);
+            if (dto.getProdutorId() != null) {
+                usuario.setProdutorId(dto.getProdutorId());
+            } else if (usuario.getRole() == com.agrotijuco.sistema.model.Role.PRODUTOR) {
+                com.agrotijuco.sistema.model.Produtor produtor = produtorRepository.findByEmailIgnoringTenant(usuario.getEmail())
+                        .orElseGet(() -> {
+                            com.agrotijuco.sistema.model.Produtor p = new com.agrotijuco.sistema.model.Produtor(
+                                    usuario.getNome(),
+                                    "CPF-" + java.util.UUID.randomUUID().toString().substring(0, 8),
+                                    usuario.getEmail(),
+                                    ""
+                            );
+                            p.setTenantId(tenant);
+                            return produtorRepository.save(p);
+                        });
                 usuario.setProdutorId(produtor.getId());
             }
 

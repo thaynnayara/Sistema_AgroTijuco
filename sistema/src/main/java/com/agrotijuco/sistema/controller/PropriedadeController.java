@@ -36,9 +36,19 @@ public class PropriedadeController {
     @PreAuthorize("hasAnyRole('ADMIN', 'GESTOR')")
     public ResponseEntity<Propriedade> cadastrarDireto(
             @RequestBody Propriedade propriedade,
+            @RequestParam(required = false) List<UUID> produtorIds,
             @RequestParam(required = false) UUID produtorId) {
-        UUID targetProdutorId = produtorId != null ? produtorId : propriedade.getProdutorId();
-        Propriedade novaPropriedade = service.cadastrar(propriedade, targetProdutorId);
+        List<UUID> targetIds = new java.util.ArrayList<>();
+        if (produtorIds != null && !produtorIds.isEmpty()) {
+            targetIds.addAll(produtorIds);
+        } else if (produtorId != null) {
+            targetIds.add(produtorId);
+        } else if (propriedade.getProdutorIdsInput() != null && !propriedade.getProdutorIdsInput().isEmpty()) {
+            targetIds.addAll(propriedade.getProdutorIdsInput());
+        } else if (propriedade.getProdutorId() != null) {
+            targetIds.add(propriedade.getProdutorId());
+        }
+        Propriedade novaPropriedade = service.cadastrar(propriedade, targetIds);
         return ResponseEntity.status(HttpStatus.CREATED).body(novaPropriedade);
     }
 
@@ -51,6 +61,16 @@ public class PropriedadeController {
 
         Propriedade novaPropriedade = service.cadastrar(propriedade, produtorId);
         return ResponseEntity.status(HttpStatus.CREATED).body(novaPropriedade);
+    }
+
+    @PutMapping("/{propriedadeId}/atribuir-produtores")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GESTOR')")
+    public ResponseEntity<Propriedade> atribuirProdutores(
+            @PathVariable UUID propriedadeId,
+            @RequestBody List<UUID> produtorIds) {
+
+        Propriedade atualizada = service.atribuirProdutores(propriedadeId, produtorIds);
+        return ResponseEntity.ok(atualizada);
     }
 
     // Apenas a Gestora/Admin pode alterar/atribuir a fazenda a outro produtor

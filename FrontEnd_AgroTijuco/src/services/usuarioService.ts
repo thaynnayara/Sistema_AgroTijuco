@@ -94,6 +94,27 @@ export const usuarioService = {
     return encontrado;
   },
 
+  async vincularProdutor(usuarioId: string, produtorId: string | null): Promise<User> {
+    const param = produtorId ? `?produtorId=${produtorId}` : '';
+    let updated: User | null = null;
+    try {
+      const res = await api.patch<User>(`/api/v1/usuarios/${usuarioId}/produtor${param}`);
+      updated = res.data;
+    } catch {
+      try {
+        const fallback = await api.patch<User>(`/usuarios/${usuarioId}/produtor${param}`);
+        updated = fallback.data;
+      } catch (err) {
+        console.warn('Erro ao vincular produtor no backend:', err);
+      }
+    }
+
+    const locais = obterUsuariosLocais();
+    const atualizados = locais.map((u) => (u.id === usuarioId ? { ...u, produtorId: produtorId || undefined } : u));
+    salvarUsuariosLocais(atualizados);
+    return updated || atualizados.find((u) => u.id === usuarioId)!;
+  },
+
   async cadastrar(input: NovoUsuarioInput): Promise<User> {
     try {
       await authService.cadastrarNovoUsuario({
@@ -102,6 +123,7 @@ export const usuarioService = {
         senha: input.senha,
         tenantId: input.tenantId || 'Fazenda AgroTijuco',
         role: input.role,
+        produtorId: input.produtorId,
       });
     } catch (e) {
       console.warn('Erro na chamada do backend, persistindo usuário localmente:', e);

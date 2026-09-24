@@ -2,6 +2,17 @@ import { api } from './api';
 import type { Propriedade, CreatePropriedadeInput } from '../types';
 
 export const propriedadeService = {
+  async criarParaProdutores(produtorUuids: string[] | undefined | null, data: CreatePropriedadeInput): Promise<Propriedade> {
+    const ids = produtorUuids && produtorUuids.length > 0 ? produtorUuids : [];
+    const payload = {
+      ...data,
+      produtorIds: ids,
+      produtoresIds: ids,
+    };
+    const response = await api.post<Propriedade>('/propriedades', payload);
+    return response.data;
+  },
+
   async criarParaProdutor(produtorUuid: string | undefined | null, data: CreatePropriedadeInput): Promise<Propriedade> {
     if (produtorUuid && produtorUuid.trim().length > 0) {
       const response = await api.post<Propriedade>(`/propriedades/produtor/${produtorUuid}`, data);
@@ -17,6 +28,11 @@ export const propriedadeService = {
       return response.data;
     }
     const response = await api.post<Propriedade>('/propriedades', data);
+    return response.data;
+  },
+
+  async atribuirProdutores(propriedadeId: string, produtorUuids: string[]): Promise<Propriedade> {
+    const response = await api.put<Propriedade>(`/propriedades/${propriedadeId}/atribuir-produtores`, produtorUuids || []);
     return response.data;
   },
 

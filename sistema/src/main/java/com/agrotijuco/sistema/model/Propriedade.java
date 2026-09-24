@@ -33,6 +33,19 @@ public class Propriedade extends Auditable {
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private Produtor produtor;
 
+    @jakarta.persistence.ManyToMany(fetch = FetchType.EAGER)
+    @jakarta.persistence.JoinTable(
+        name = "tb_propriedade_produtores",
+        joinColumns = @JoinColumn(name = "propriedade_id"),
+        inverseJoinColumns = @JoinColumn(name = "produtor_id")
+    )
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    private java.util.Set<Produtor> produtores = new java.util.HashSet<>();
+
+    @jakarta.persistence.Transient
+    @JsonAlias({"produtoresIds", "produtorIds"})
+    private java.util.List<UUID> produtorIdsInput;
+
     public Propriedade() {}
 
     public Propriedade(String nomeFazenda, String municipio, Double areaHectares, Produtor produtor) {
@@ -40,6 +53,9 @@ public class Propriedade extends Auditable {
         this.municipio = municipio;
         this.areaHectares = areaHectares;
         this.produtor = produtor;
+        if (produtor != null) {
+            this.produtores.add(produtor);
+        }
     }
 
     public String getNomeFazenda() {
@@ -100,15 +116,99 @@ public class Propriedade extends Auditable {
 
     public void setProdutor(Produtor produtor) {
         this.produtor = produtor;
+        if (produtor != null) {
+            if (this.produtores == null) {
+                this.produtores = new java.util.HashSet<>();
+            }
+            this.produtores.add(produtor);
+        }
+    }
+
+    public java.util.Set<Produtor> getProdutores() {
+        if (produtores == null) {
+            produtores = new java.util.HashSet<>();
+        }
+        return produtores;
+    }
+
+    public void setProdutores(java.util.Set<Produtor> produtores) {
+        this.produtores = produtores != null ? produtores : new java.util.HashSet<>();
+        if (this.produtor == null && !this.produtores.isEmpty()) {
+            this.produtor = this.produtores.iterator().next();
+        }
+    }
+
+    public java.util.List<UUID> getProdutorIdsInput() {
+        return produtorIdsInput;
+    }
+
+    public void setProdutorIdsInput(java.util.List<UUID> produtorIdsInput) {
+        this.produtorIdsInput = produtorIdsInput;
+    }
+
+    @JsonProperty("produtoresIds")
+    public java.util.List<UUID> getProdutoresIds() {
+        java.util.Set<UUID> ids = new java.util.LinkedHashSet<>();
+        try {
+            if (produtores != null) {
+                for (Produtor p : produtores) {
+                    if (p != null && p.getId() != null) {
+                        ids.add(p.getId());
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+        try {
+            if (produtor != null && produtor.getId() != null) {
+                ids.add(produtor.getId());
+            }
+        } catch (Exception ignored) {}
+        return new java.util.ArrayList<>(ids);
+    }
+
+    @JsonProperty("produtorNomes")
+    public java.util.List<String> getProdutorNomes() {
+        java.util.List<String> nomes = new java.util.ArrayList<>();
+        try {
+            if (produtores != null && !produtores.isEmpty()) {
+                for (Produtor p : produtores) {
+                    if (p != null && p.getNome() != null && !p.getNome().isBlank()) {
+                        if (!nomes.contains(p.getNome())) {
+                            nomes.add(p.getNome());
+                        }
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+        try {
+            if (produtor != null && produtor.getNome() != null) {
+                if (!nomes.contains(produtor.getNome())) {
+                    nomes.add(produtor.getNome());
+                }
+            }
+        } catch (Exception ignored) {}
+        return nomes;
     }
 
     @JsonProperty("produtorId")
     public UUID getProdutorId() {
-        return produtor != null ? produtor.getId() : null;
+        try {
+            return produtor != null ? produtor.getId() : null;
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     @JsonProperty("produtorNome")
     public String getProdutorNome() {
-        return produtor != null ? produtor.getNome() : null;
+        try {
+            java.util.List<String> nomes = getProdutorNomes();
+            if (!nomes.isEmpty()) {
+                return String.join(", ", nomes);
+            }
+            return produtor != null ? produtor.getNome() : null;
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 }

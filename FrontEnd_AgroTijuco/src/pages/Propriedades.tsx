@@ -4,7 +4,7 @@ import { produtorService } from '../services/produtorService';
 import { usuarioService } from '../services/usuarioService';
 import { useAuth } from '../contexts/AuthContext';
 import { useFarm } from '../contexts/FarmContext';
-import type { Propriedade, Produtor } from '../types';
+import type { Propriedade, Produtor, User } from '../types';
 import { 
   Home, 
   Plus, 
@@ -18,21 +18,48 @@ import {
   Trash2,
   UserPlus,
   Star,
-  AlertCircle
+  AlertCircle,
+  Users,
+  ShieldCheck,
+  Check,
+  Edit3
 } from 'lucide-react';
 
 export const Propriedades: React.FC = () => {
   const { showTechnicalDetails, isGestor, isAdmin, user } = useAuth();
-  const { selectedFarm, selectFarmById, recarregarFazendas, propriedades: contextPropriedades } = useFarm();
-  const [propriedades, setPropriedades] = useState<Propriedade[]>([]);
+  const { 
+    selectedFarm, 
+    selectFarmById, 
+    recarregarFazendas, 
+    cadastrarFazenda, 
+    atualizarFazenda,
+    propriedades: contextPropriedades 
+  } = useFarm();
+
+  const [propriedades, setPropriedades] = useState<Propriedade[]>(contextPropriedades);
   const [produtores, setProdutores] = useState<Produtor[]>([]);
+  const [usuariosProdutores, setUsuariosProdutores] = useState<User[]>([]);
   const [realBackendProducerIds, setRealBackendProducerIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState<boolean>(true);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [modalOpen, setModalOpen] = useState<boolean>(false);
   const [reassignModalOpen, setReassignModalOpen] = useState<boolean>(false);
   const [selectedPropForReassign, setSelectedPropForReassign] = useState<Propriedade | null>(null);
-  const [newSelectedProdutorId, setNewSelectedProdutorId] = useState<string>('');
+
+  // Edição de Propriedade
+  const [editModalOpen, setEditModalOpen] = useState<boolean>(false);
+  const [selectedPropForEdit, setSelectedPropForEdit] = useState<Propriedade | null>(null);
+  const [editNomeFazenda, setEditNomeFazenda] = useState('');
+  const [editAreaHectares, setEditAreaHectares] = useState<number>(100);
+  const [editLocalizacao, setEditLocalizacao] = useState('');
+  const [editInscricaoEstadual, setEditInscricaoEstadual] = useState('');
+  
+  // Múltiplos produtores selecionados
+  const [selectedProdutorIds, setSelectedProdutorIds] = useState<string[]>([]);
+  const [newSelectedProdutorIds, setNewSelectedProdutorIds] = useState<string[]>([]);
+  const [producerSearchTerm, setProducerSearchTerm] = useState<string>('');
+  const [reassignSearchTerm, setReassignSearchTerm] = useState<string>('');
+
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -42,7 +69,6 @@ export const Propriedades: React.FC = () => {
   const [areaHectares, setAreaHectares] = useState<number>(100);
   const [localizacao, setLocalizacao] = useState('');
   const [inscricaoEstadual, setInscricaoEstadual] = useState('');
-  const [selectedProdutorId, setSelectedProdutorId] = useState('');
 
   // Modo rápido de criação de produtor inline
   const [isNewProducerMode, setIsNewProducerMode] = useState(false);
@@ -54,15 +80,22 @@ export const Propriedades: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [propsData, prodsData] = await Promise.all([
+      const [propsData, prodsData, usersData] = await Promise.all([
         propriedadeService.listarTodas().catch(() => []),
         produtorService.listar().catch(() => []),
+        usuarioService.listar().catch(() => []),
       ]);
 
-      const initialFarms = (propsData && propsData.length > 0)
-        ? propsData
-        : contextPropriedades;
-      setPropriedades(initialFarms);
+      if (propsData && propsData.length > 0) {
+        setPropriedades(propsData);
+      } else if (contextPropriedades && contextPropriedades.length > 0) {
+        setPropriedades(contextPropriedades);
+      }
+
+      const usersProdList = (usersData || []).filter(
+        (u: any) => u.role === 'PRODUTOR' || u.perfil === 'PRODUTOR'
+      );
+      setUsuariosProdutores(usersProdList);
 
       const prodsMap = new Map<string, Produtor>();
       const backendIds = new Set<string>();
@@ -75,36 +108,27 @@ export const Propriedades: React.FC = () => {
       });
       setRealBackendProducerIds(backendIds);
 
-      try {
-        const users = await usuarioService.listar().catch(() => []);
-        (users || [])
-          .filter((u: any) => u.role === 'PRODUTOR' || u.perfil === 'PRODUTOR')
-          .forEach((u: any) => {
-            const uid = u.produtorId || u.id;
-            const exists = Array.from(prodsMap.values()).some(
-              (p) => p.id === uid || p.id === u.id || (p.nome && u.nome && p.nome.trim().toLowerCase() === u.nome.trim().toLowerCase())
-            );
-            if (!exists) {
-              prodsMap.set(u.id, {
-                id: u.id,
-                nome: u.nome,
-                cpfCnpj: u.cpfCnpj || 'Produtor (Usuário Cadastrado)',
-                email: u.email,
-                telefone: u.telefone || '',
-              });
-            }
+      // Sincroniza e vincula usuários com perfil PRODUTOR à lista de produtores disponíveis
+      usersProdList.forEach((u: any) => {
+        const uid = u.produtorId || u.id;
+        const exists = Array.from(prodsMap.values()).some(
+          (p) => p.id === uid || p.id === u.id || (p.nome && u.nome && p.nome.trim().toLowerCase() === u.nome.trim().toLowerCase())
+        );
+        if (!exists) {
+          prodsMap.set(u.id, {
+            id: u.id,
+            nome: u.nome,
+            cpfCnpj: u.produtorCpfCnpj || 'Usuário Cadastrado',
+            email: u.email,
+            telefone: u.telefone || '',
           });
-      } catch {}
+        }
+      });
 
       const prods = Array.from(prodsMap.values());
       setProdutores(prods);
-      setIsNewProducerMode(false);
-      setSelectedProdutorId('');
     } catch {
       setPropriedades(contextPropriedades);
-      setProdutores([]);
-      setIsNewProducerMode(false);
-      setSelectedProdutorId('');
     } finally {
       setLoading(false);
     }
@@ -113,6 +137,13 @@ export const Propriedades: React.FC = () => {
   useEffect(() => {
     loadData();
   }, []);
+
+  // Mantém propriedades sincronizadas com o contextPropriedades se ele tiver mais itens
+  useEffect(() => {
+    if (contextPropriedades && contextPropriedades.length > 0 && propriedades.length === 0) {
+      setPropriedades(contextPropriedades);
+    }
+  }, [contextPropriedades]);
 
   const ensureRealProducerId = async (producerId: string): Promise<string> => {
     if (!producerId) return '';
@@ -155,10 +186,26 @@ export const Propriedades: React.FC = () => {
     setNovoProdutorCpfCnpj('');
     setNovoProdutorTelefone('');
     setNovoProdutorEmail('');
-
+    setProducerSearchTerm('');
+    setSelectedProdutorIds([]);
     setIsNewProducerMode(false);
-    setSelectedProdutorId('');
     setModalOpen(true);
+  };
+
+  const handleToggleProducerSelection = (producerId: string) => {
+    setSelectedProdutorIds((prev) => 
+      prev.includes(producerId) 
+        ? prev.filter((id) => id !== producerId) 
+        : [...prev, producerId]
+    );
+  };
+
+  const handleToggleReassignSelection = (producerId: string) => {
+    setNewSelectedProdutorIds((prev) => 
+      prev.includes(producerId) 
+        ? prev.filter((id) => id !== producerId) 
+        : [...prev, producerId]
+    );
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -180,18 +227,20 @@ export const Propriedades: React.FC = () => {
     }
 
     try {
-      let finalProdutorId: string | undefined = selectedProdutorId || undefined;
-      let finalProdutorNome = '';
+      const finalProducerIds: string[] = [];
 
-      // Se o usuário está cadastrando um novo produtor inline
-      if (isNewProducerMode) {
-        if (!novoProdutorNome.trim()) {
-          setErrorMsg('Informe o nome do produtor rural.');
-          setSubmitting(false);
-          return;
+      // 1. Processa os produtores selecionados
+      for (const pid of selectedProdutorIds) {
+        const realId = await ensureRealProducerId(pid);
+        if (realId && !finalProducerIds.includes(realId)) {
+          finalProducerIds.push(realId);
         }
+      }
+
+      // 2. Se cadastrou novo produtor inline
+      if (isNewProducerMode && novoProdutorNome.trim()) {
         if (!novoProdutorCpfCnpj.trim()) {
-          setErrorMsg('Informe o CPF ou CNPJ do produtor.');
+          setErrorMsg('Informe o CPF ou CNPJ do novo produtor.');
           setSubmitting(false);
           return;
         }
@@ -203,18 +252,11 @@ export const Propriedades: React.FC = () => {
           email: novoProdutorEmail.trim() || 'produtor@agrotijuco.com.br',
         });
 
-        finalProdutorId = novoProd.id || undefined;
-        finalProdutorNome = novoProd.nome;
-
-        if (novoProd.id) {
-          setRealBackendProducerIds(prev => new Set(prev).add(novoProd.id));
+        if (novoProd && novoProd.id) {
+          finalProducerIds.push(novoProd.id);
+          setRealBackendProducerIds((prev) => new Set(prev).add(novoProd.id!));
+          setProdutores((prev) => [novoProd, ...prev]);
         }
-        setProdutores(prev => [novoProd, ...prev]);
-      } else if (finalProdutorId) {
-        const realId = await ensureRealProducerId(finalProdutorId);
-        finalProdutorId = realId;
-        const prod = produtores.find(p => p.id === finalProdutorId || p.id === selectedProdutorId);
-        finalProdutorNome = prod?.nome || 'Produtor Responsável';
       }
 
       const inputData = {
@@ -226,67 +268,34 @@ export const Propriedades: React.FC = () => {
         inscricaoEstadual: inscricaoEstadual.trim(),
       };
 
-      let created: Propriedade;
-      if (finalProdutorId) {
-        created = await propriedadeService.criarParaProdutor(finalProdutorId, inputData);
-      } else {
-        try {
-          created = await propriedadeService.criarParaProdutor(undefined, inputData);
-        } catch (errSemProd: any) {
-          console.warn('Backend requer produtor_id, vinculando a produtor padrão do sistema:', errSemProd);
-          let prodGeral = produtores.find(
-            p => p.nome.includes('Sem Produtor') || p.nome.includes('Geral')
-          );
-          let prodGeralId = prodGeral?.id;
-          if (!prodGeralId || !realBackendProducerIds.has(prodGeralId)) {
-            const novoGeral = await produtorService.criar({
-              nome: 'Sem Produtor Vinculado',
-              cpfCnpj: '000.000.000-00',
-              email: 'sem.produtor@agrotijuco.com.br',
-              telefone: '(00) 00000-0000',
-            });
-            prodGeralId = novoGeral.id;
-            if (novoGeral.id) {
-              setRealBackendProducerIds(prev => new Set(prev).add(novoGeral.id));
-            }
-          }
-          created = await propriedadeService.criarParaProdutor(prodGeralId, inputData);
-          created.produtorNome = undefined;
-          created.produtorId = undefined;
-        }
-      }
+      // Usa cadastrarFazenda do context que salva no backend E sincroniza o cache local
+      const createdFarm = await cadastrarFazenda(inputData, finalProducerIds);
 
-      const isDefaultProd = finalProdutorNome === 'Sem Produtor Vinculado' || finalProdutorNome.includes('Sem Produtor');
-      const novaProp: Propriedade = {
-        ...created,
-        id: created.id || `prop-${Date.now()}`,
-        nome: created.nome || created.nomeFazenda || inputData.nome,
-        nomeFazenda: created.nomeFazenda || inputData.nome,
-        areaHectares: created.areaHectares || inputData.areaHectares,
-        localizacao: created.localizacao || created.municipio || inputData.localizacao,
-        municipio: created.municipio || inputData.localizacao,
-        produtorId: isDefaultProd ? undefined : (finalProdutorId || undefined),
-        produtorNome: isDefaultProd ? undefined : (finalProdutorNome || undefined),
-      };
+      // Garante que a lista local tenha a nova fazenda
+      setPropriedades((prev) => [createdFarm, ...prev.filter((p) => p.id !== createdFarm.id)]);
 
-      setPropriedades(prev => [novaProp, ...prev]);
-      await recarregarFazendas();
       if (!selectedFarm || !selectedFarm.id) {
-        selectFarmById(novaProp.id!);
+        selectFarmById(createdFarm.id!);
       }
+
+      const nomesVinculados = produtores
+        .filter((p) => p.id && finalProducerIds.includes(p.id))
+        .map((p) => p.nome)
+        .join(', ');
 
       setSuccessMsg(
-        finalProdutorNome && !isDefaultProd
-          ? `Propriedade "${novaProp.nome}" cadastrada e vinculada com sucesso a ${finalProdutorNome}!`
-          : `Propriedade "${novaProp.nome}" cadastrada com sucesso (sem produtor vinculado)!`
+        finalProducerIds.length > 0
+          ? `Fazenda "${createdFarm.nome}" cadastrada e vinculada a: ${nomesVinculados || 'Produtor(es)'}!`
+          : `Fazenda "${createdFarm.nome}" cadastrada com sucesso (sem produtores vinculados)!`
       );
+
       setTimeout(() => {
         setModalOpen(false);
         setSuccessMsg(null);
       }, 1500);
     } catch (err: any) {
       console.error('Erro ao cadastrar propriedade:', err);
-      setErrorMsg(err.response?.data?.message || 'Erro ao cadastrar propriedade. Verifique os dados e tente novamente.');
+      setErrorMsg(err.response?.data?.message || err.message || 'Erro ao cadastrar propriedade. Verifique os dados e tente novamente.');
     } finally {
       setSubmitting(false);
     }
@@ -294,7 +303,11 @@ export const Propriedades: React.FC = () => {
 
   const handleOpenReassign = (prop: Propriedade) => {
     setSelectedPropForReassign(prop);
-    setNewSelectedProdutorId(prop.produtorId || '');
+    const existing = prop.produtoresIds && prop.produtoresIds.length > 0 
+      ? prop.produtoresIds 
+      : (prop.produtorId ? [prop.produtorId] : []);
+    setNewSelectedProdutorIds(existing);
+    setReassignSearchTerm('');
     setReassignModalOpen(true);
   };
 
@@ -302,64 +315,89 @@ export const Propriedades: React.FC = () => {
     if (!selectedPropForReassign || !selectedPropForReassign.id) return;
     setSubmitting(true);
     try {
-      if (newSelectedProdutorId) {
-        const realId = await ensureRealProducerId(newSelectedProdutorId);
-        await propriedadeService.atribuirProdutor(selectedPropForReassign.id, realId);
-        const targetProd = produtores.find((p) => p.id === newSelectedProdutorId || p.id === realId);
-
-        setPropriedades((prev) =>
-          prev.map((p) =>
-            p.id === selectedPropForReassign.id
-              ? {
-                  ...p,
-                  produtorId: realId,
-                  produtorNome: targetProd?.nome || 'Produtor Responsável',
-                }
-              : p
-          )
-        );
-        setSuccessMsg(`Propriedade "${selectedPropForReassign.nome || selectedPropForReassign.nomeFazenda}" vinculada ao produtor "${targetProd?.nome}" com sucesso!`);
-      } else {
-        try {
-          await propriedadeService.atribuirProdutor(selectedPropForReassign.id, null);
-        } catch {
-          let prodGeral = produtores.find(
-            p => p.nome.includes('Sem Produtor') || p.nome.includes('Geral')
-          );
-          let prodGeralId = prodGeral?.id;
-          if (!prodGeralId || !realBackendProducerIds.has(prodGeralId)) {
-            const novoGeral = await produtorService.criar({
-              nome: 'Sem Produtor Vinculado',
-              cpfCnpj: '000.000.000-00',
-              email: 'sem.produtor@agrotijuco.com.br',
-              telefone: '(00) 00000-0000',
-            });
-            prodGeralId = novoGeral.id;
-            if (novoGeral.id) {
-              setRealBackendProducerIds(prev => new Set(prev).add(novoGeral.id));
-            }
-          }
-          await propriedadeService.atribuirProdutor(selectedPropForReassign.id, prodGeralId);
+      const realIds: string[] = [];
+      for (const pid of newSelectedProdutorIds) {
+        const realId = await ensureRealProducerId(pid);
+        if (realId && !realIds.includes(realId)) {
+          realIds.push(realId);
         }
-        setPropriedades((prev) =>
-          prev.map((p) =>
-            p.id === selectedPropForReassign.id
-              ? {
-                  ...p,
-                  produtorId: undefined,
-                  produtorNome: undefined,
-                }
-              : p
-          )
-        );
-        setSuccessMsg(`Vínculo de produtor removido da propriedade "${selectedPropForReassign.nome || selectedPropForReassign.nomeFazenda}".`);
       }
 
-      await recarregarFazendas();
-      setReassignModalOpen(false);
-      setSelectedPropForReassign(null);
+      const targetProds = produtores.filter((p) => p.id && realIds.includes(p.id));
+      const nomes = targetProds.map((p) => p.nome);
+
+      const atualizada = await atualizarFazenda(selectedPropForReassign.id, {
+        produtoresIds: realIds,
+        produtorId: realIds[0] || undefined,
+        produtorNome: nomes.join(', ') || undefined,
+        produtorNomes: nomes,
+      });
+
+      setPropriedades((prev) =>
+        prev.map((p) => (p.id === selectedPropForReassign.id ? { ...p, ...atualizada } : p))
+      );
+
+      setSuccessMsg(
+        realIds.length > 0
+          ? `Fazenda vinculada com sucesso a ${nomes.join(', ')}!`
+          : `Vínculos de produtores removidos da fazenda.`
+      );
+
+      setTimeout(() => {
+        setReassignModalOpen(false);
+        setSelectedPropForReassign(null);
+        setSuccessMsg(null);
+      }, 1200);
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Erro ao atualizar produtor da fazenda.');
+      alert(err.response?.data?.message || err.message || 'Erro ao atualizar produtores da fazenda.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleOpenEdit = (prop: Propriedade) => {
+    setSelectedPropForEdit(prop);
+    setEditNomeFazenda(prop.nome || prop.nomeFazenda || '');
+    setEditAreaHectares(prop.areaHectares || 100);
+    setEditLocalizacao(prop.localizacao || prop.municipio || '');
+    setEditInscricaoEstadual(prop.inscricaoEstadual || '');
+    setErrorMsg(null);
+    setEditModalOpen(true);
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPropForEdit || !selectedPropForEdit.id) return;
+    if (!editNomeFazenda.trim()) {
+      alert('O nome da fazenda é obrigatório.');
+      return;
+    }
+    if (!editAreaHectares || editAreaHectares <= 0) {
+      alert('A área em hectares deve ser maior que zero.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const atualizada = await atualizarFazenda(selectedPropForEdit.id, {
+        nome: editNomeFazenda.trim(),
+        nomeFazenda: editNomeFazenda.trim(),
+        areaHectares: Number(editAreaHectares),
+        localizacao: editLocalizacao.trim() || 'Localização não informada',
+        municipio: editLocalizacao.trim() || 'Localização não informada',
+        inscricaoEstadual: editInscricaoEstadual.trim(),
+      });
+
+      setPropriedades((prev) =>
+        prev.map((p) => (p.id === selectedPropForEdit.id ? { ...p, ...atualizada } : p))
+      );
+
+      setSuccessMsg(`Dados da fazenda "${atualizada.nome}" atualizados com sucesso!`);
+      setEditModalOpen(false);
+      setSelectedPropForEdit(null);
+      setTimeout(() => setSuccessMsg(null), 3000);
+    } catch (err: any) {
+      alert(err.response?.data?.message || err.message || 'Erro ao atualizar dados da fazenda.');
     } finally {
       setSubmitting(false);
     }
@@ -374,10 +412,10 @@ export const Propriedades: React.FC = () => {
 
     try {
       await propriedadeService.deletarPropriedade(prop.id);
-      setPropriedades(prev => prev.filter(p => p.id !== prop.id));
+      setPropriedades((prev) => prev.filter((p) => p.id !== prop.id));
       await recarregarFazendas();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Erro ao excluir a propriedade.');
+      alert(err.response?.data?.message || err.message || 'Erro ao excluir a propriedade.');
     }
   };
 
@@ -385,17 +423,21 @@ export const Propriedades: React.FC = () => {
     navigator.clipboard.writeText(uuid);
   };
 
-  // Se for produtor, filtra apenas as fazendas atribuídas a ele
+  // Se for produtor logado, filtra apenas as fazendas atribuídas a ele
   const displayPropriedades = (isAdmin || isGestor) || !user?.produtorId
     ? propriedades
-    : propriedades.filter((p) => p.produtorId === user.produtorId);
+    : propriedades.filter((p) => 
+        p.produtorId === user.produtorId || 
+        (p.produtoresIds && p.produtoresIds.includes(user.produtorId!))
+      );
 
   const filtered = displayPropriedades.filter((p) => {
     const nome = (p.nome || p.nomeFazenda || '').toLowerCase();
     const loc = (p.localizacao || p.municipio || '').toLowerCase();
     const prod = (p.produtorNome || '').toLowerCase();
+    const prodNomes = (p.produtorNomes || []).join(' ').toLowerCase();
     const term = searchTerm.toLowerCase();
-    return nome.includes(term) || loc.includes(term) || prod.includes(term);
+    return nome.includes(term) || loc.includes(term) || prod.includes(term) || prodNomes.includes(term);
   });
 
   return (
@@ -408,7 +450,7 @@ export const Propriedades: React.FC = () => {
           </h1>
           <p className="text-sm text-slate-600">
             {isGestor || isAdmin
-              ? 'Cadastre fazendas, vincule ao produtor rural responsável e selecione a fazenda ativa para os manejos.'
+              ? 'Cadastre fazendas, vincule múltiplos produtores rurais (co-proprietários) e gerencie a fazenda ativa para os manejos.'
               : 'Propriedades rurais vinculadas ao seu perfil de produtor para consulta e lançamentos.'}
           </p>
         </div>
@@ -420,7 +462,7 @@ export const Propriedades: React.FC = () => {
             className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-agro-primary hover:bg-agro-primary-hover text-white font-semibold text-sm shadow-sm transition-all cursor-pointer"
           >
             <Plus className="w-5 h-5 mr-1.5" />
-            Cadastrar & Vincular Fazenda
+            Cadastrar Fazenda & Vincular Produtores
           </button>
         )}
       </div>
@@ -446,7 +488,7 @@ export const Propriedades: React.FC = () => {
           <Search className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
-            placeholder={isGestor || isAdmin ? "Buscar por nome da fazenda, produtor ou município..." : "Buscar entre minhas fazendas..."}
+            placeholder={isGestor || isAdmin ? "Buscar por nome da fazenda, produtor responsável ou município..." : "Buscar entre minhas fazendas..."}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-agro-primary focus:bg-white transition-colors"
@@ -465,7 +507,7 @@ export const Propriedades: React.FC = () => {
           <h3 className="text-base font-bold text-slate-700 mt-2">Nenhuma propriedade cadastrada</h3>
           <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
             {isGestor || isAdmin
-              ? 'Clique em "Cadastrar & Vincular Fazenda" acima para registrar a primeira fazenda e apontar para o produtor responsável.'
+              ? 'Clique em "Cadastrar Fazenda & Vincular Produtores" acima para registrar a primeira fazenda e associar aos produtores rurais.'
               : 'Nenhuma fazenda foi vinculada ao seu usuário ainda. Entre em contato com a gestão da fazenda.'}
           </p>
         </div>
@@ -476,6 +518,11 @@ export const Propriedades: React.FC = () => {
             const farmNome = prop.nome || prop.nomeFazenda || 'Fazenda sem nome';
             const farmLoc = prop.localizacao || prop.municipio || 'Localização não informada';
             const farmArea = prop.areaHectares ? prop.areaHectares.toLocaleString('pt-BR') : '0';
+
+            // Lista de nomes de produtores
+            const nomesProdutores: string[] = prop.produtorNomes && prop.produtorNomes.length > 0
+              ? prop.produtorNomes
+              : (prop.produtorNome ? prop.produtorNome.split(',').map((s) => s.trim()) : []);
 
             return (
               <div
@@ -516,29 +563,47 @@ export const Propriedades: React.FC = () => {
                   <h3 className="text-lg font-bold text-slate-900 leading-snug">{farmNome}</h3>
                   
                   <div className="mt-3.5 space-y-2 text-xs text-slate-600">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center truncate">
-                        <Building2 className="w-4 h-4 text-agro-primary mr-2 shrink-0" />
-                        <span className="font-semibold text-slate-700 mr-1">Produtor:</span>
-                        {prop.produtorNome && !prop.produtorNome.includes('Sem Produtor') && !prop.produtorNome.includes('Administração Geral') ? (
-                          <span className="truncate text-slate-900 font-medium">{prop.produtorNome}</span>
-                        ) : (
-                          <span className="truncate italic text-slate-400 font-medium">Sem produtor vinculado</span>
+                    {/* LISTAGEM DE PRODUTORES */}
+                    <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="font-bold text-slate-700 flex items-center text-[11px]">
+                          <Users className="w-3.5 h-3.5 text-agro-primary mr-1" />
+                          {nomesProdutores.length > 1
+                            ? `Produtores Rurais (${nomesProdutores.length}):`
+                            : 'Produtor Rural:'}
+                        </span>
+
+                        {(isGestor || isAdmin) && (
+                          <button
+                            onClick={() => handleOpenReassign(prop)}
+                            className="text-[11px] text-agro-primary hover:underline font-bold shrink-0 cursor-pointer"
+                            title="Gerenciar vínculos de produtores"
+                          >
+                            {nomesProdutores.length > 0 ? 'Gerenciar' : '+ Vincular'}
+                          </button>
                         )}
                       </div>
 
-                      {(isGestor || isAdmin) && (
-                        <button
-                          onClick={() => handleOpenReassign(prop)}
-                          className="ml-2 text-[11px] text-agro-primary hover:underline font-bold shrink-0 cursor-pointer"
-                          title={prop.produtorId ? "Vincular a outro produtor" : "Vincular produtor"}
-                        >
-                          {prop.produtorId ? 'Trocar' : 'Vincular'}
-                        </button>
+                      {nomesProdutores.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {nomesProdutores.map((nome, idx) => (
+                            <span
+                              key={idx}
+                              className="inline-flex items-center px-2 py-0.5 bg-white text-slate-800 border border-slate-200 rounded-md text-[11px] font-medium shadow-2xs"
+                            >
+                              <Building2 className="w-3 h-3 mr-1 text-agro-primary" />
+                              {nome}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="italic text-slate-400 text-[11px]">
+                          Sem produtores vinculados
+                        </span>
                       )}
                     </div>
 
-                    <div className="flex items-center">
+                    <div className="flex items-center pt-1">
                       <MapPin className="w-4 h-4 text-amber-600 mr-2 shrink-0" />
                       <span>{farmLoc}</span>
                     </div>
@@ -567,16 +632,24 @@ export const Propriedades: React.FC = () => {
                   )}
 
                   {(isGestor || isAdmin) && (
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-1.5">
+                      <button
+                        onClick={() => handleOpenEdit(prop)}
+                        className="p-1.5 text-slate-500 hover:text-agro-primary hover:bg-slate-100 rounded-lg transition-colors cursor-pointer border border-slate-200"
+                        title="Editar dados da fazenda (nome, área, localização)"
+                      >
+                        <Edit3 className="w-4 h-4" />
+                      </button>
                       <button
                         onClick={() => handleOpenReassign(prop)}
-                        className="text-slate-600 hover:text-agro-primary hover:underline font-semibold cursor-pointer"
+                        className="text-xs px-2.5 py-1 text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg font-semibold transition-colors cursor-pointer"
+                        title="Gerenciar produtores rurais vinculados"
                       >
-                        {prop.produtorId ? 'Trocar Produtor' : 'Vincular Produtor'}
+                        Produtores
                       </button>
                       <button
                         onClick={() => handleDelete(prop)}
-                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer border border-slate-200"
                         title="Excluir propriedade"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -590,61 +663,157 @@ export const Propriedades: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL DE REATRIBUIÇÃO DE PRODUTOR */}
+      {/* MODAL DE REATRIBUIÇÃO DE MÚLTIPLOS PRODUTORES */}
       {reassignModalOpen && selectedPropForReassign && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
             <h2 className="text-lg font-bold text-slate-900 mb-1 flex items-center">
-              <Building2 className="w-5 h-5 text-agro-primary mr-2" />
-              Vincular Fazenda a Produtor
+              <Users className="w-5 h-5 text-agro-primary mr-2" />
+              Vincular Produtores à Fazenda
             </h2>
             <p className="text-xs text-slate-500 mb-4">
-              Selecione qual produtor rural é o responsável pela fazenda <strong>"{selectedPropForReassign.nome || selectedPropForReassign.nomeFazenda}"</strong>.
+              Selecione um ou mais produtores rurais responsáveis pela fazenda <strong>"{selectedPropForReassign.nome || selectedPropForReassign.nomeFazenda}"</strong>.
             </p>
 
             <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Selecione o Produtor
-                </label>
-                <select
-                  value={newSelectedProdutorId}
-                  onChange={(e) => setNewSelectedProdutorId(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-agro-primary cursor-pointer"
-                >
-                  <option value="">-- Nenhum (Desvincular produtor) --</option>
-                  {produtores.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.nome} {p.cpfCnpj ? `(${p.cpfCnpj})` : ''}
-                    </option>
-                  ))}
-                </select>
+              {/* CHIPS DOS SELECIONADOS */}
+              {newSelectedProdutorIds.length > 0 && (
+                <div className="space-y-1">
+                  <div className="text-[11px] font-bold text-slate-600">
+                    Produtores Selecionados ({newSelectedProdutorIds.length}):
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 p-2 bg-slate-50 border border-slate-200 rounded-xl max-h-24 overflow-y-auto">
+                    {newSelectedProdutorIds.map((pid) => {
+                      const prod = produtores.find((p) => p.id === pid);
+                      return (
+                        <span
+                          key={pid}
+                          className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-white text-slate-800 border border-slate-200 shadow-2xs"
+                        >
+                          <Building2 className="w-3.5 h-3.5 text-agro-primary mr-1" />
+                          {prod?.nome || 'Produtor'}
+                          <button
+                            type="button"
+                            onClick={() => handleToggleReassignSelection(pid)}
+                            className="ml-1.5 text-slate-400 hover:text-red-500 font-bold cursor-pointer"
+                          >
+                            ✕
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* BUSCA DE PRODUTORES */}
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Pesquisar produtor por nome, CPF ou e-mail..."
+                  value={reassignSearchTerm}
+                  onChange={(e) => setReassignSearchTerm(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-agro-primary"
+                />
               </div>
 
-              <div className="pt-4 flex items-center justify-end space-x-3 border-t border-slate-100">
+              {/* LISTA DE PRODUTORES */}
+              <div className="max-h-56 overflow-y-auto border border-slate-200 rounded-xl divide-y divide-slate-100 bg-white">
+                {produtores.length === 0 ? (
+                  <div className="p-4 text-center text-xs text-slate-400">
+                    Nenhum produtor cadastrado no sistema.
+                  </div>
+                ) : (
+                  produtores
+                    .filter((p) => {
+                      const term = reassignSearchTerm.toLowerCase();
+                      return (
+                        (p.nome || '').toLowerCase().includes(term) ||
+                        (p.cpfCnpj || '').toLowerCase().includes(term) ||
+                        (p.email || '').toLowerCase().includes(term)
+                      );
+                    })
+                    .map((p) => {
+                      const isChecked = newSelectedProdutorIds.includes(p.id || '');
+                      const isLinkedToUser = usuariosProdutores.some(
+                        (u) => u.id === p.id || u.produtorId === p.id || (u.email && p.email && u.email.toLowerCase() === p.email.toLowerCase())
+                      );
+                      return (
+                        <label
+                          key={p.id}
+                          className={`flex items-center justify-between px-3.5 py-2.5 text-xs cursor-pointer transition-colors ${
+                            isChecked ? 'bg-emerald-50/70 font-semibold' : 'hover:bg-slate-50'
+                          }`}
+                        >
+                          <div className="flex items-center space-x-3 truncate mr-2">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => p.id && handleToggleReassignSelection(p.id)}
+                              className="w-4 h-4 text-agro-primary rounded border-slate-300 focus:ring-agro-primary cursor-pointer"
+                            />
+                            <div className="truncate">
+                              <div className="text-slate-900 font-medium truncate flex items-center">
+                                {p.nome}
+                                {isLinkedToUser && (
+                                  <span className="ml-1.5 px-1.5 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-bold rounded border border-blue-200 flex items-center">
+                                    <ShieldCheck className="w-2.5 h-2.5 mr-0.5" />
+                                    Usuário Cadastrado
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[10px] text-slate-500 truncate">
+                                {p.cpfCnpj || 'Produtor Rural'} {p.email ? `• ${p.email}` : ''}
+                              </div>
+                            </div>
+                          </div>
+                          {isChecked && (
+                            <span className="text-[10px] text-emerald-700 bg-emerald-100 font-bold px-1.5 py-0.5 rounded shrink-0 flex items-center">
+                              <Check className="w-3 h-3 mr-0.5" />
+                              Selecionado
+                            </span>
+                          )}
+                        </label>
+                      );
+                    })
+                )}
+              </div>
+
+              <div className="pt-4 flex items-center justify-between border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setReassignModalOpen(false)}
-                  className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+                  onClick={() => setNewSelectedProdutorIds([])}
+                  className="text-xs text-red-600 hover:underline font-semibold cursor-pointer"
                 >
-                  Cancelar
+                  Desvincular Todos
                 </button>
-                <button
-                  type="button"
-                  onClick={handleSaveReassign}
-                  disabled={submitting}
-                  className="px-5 py-2 text-sm font-semibold text-white bg-agro-primary hover:bg-agro-primary-hover rounded-xl shadow-sm cursor-pointer disabled:opacity-50 flex items-center"
-                >
-                  {submitting && <Loader2 className="w-4 h-4 animate-spin mr-1.5" />}
-                  Salvar Vínculo
-                </button>
+
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => setReassignModalOpen(false)}
+                    className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveReassign}
+                    disabled={submitting}
+                    className="px-5 py-2 text-sm font-semibold text-white bg-agro-primary hover:bg-agro-primary-hover rounded-xl shadow-sm cursor-pointer disabled:opacity-50 flex items-center"
+                  >
+                    {submitting && <Loader2 className="w-4 h-4 animate-spin mr-1.5" />}
+                    Salvar Vínculos ({newSelectedProdutorIds.length})
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* MODAL DE CADASTRO INTEGRADO DE FAZENDA & PRODUTOR */}
+      {/* MODAL DE CADASTRO INTEGRADO DE FAZENDA & MÚLTIPLOS PRODUTORES */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto">
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 my-8">
@@ -653,7 +822,7 @@ export const Propriedades: React.FC = () => {
               Cadastrar Propriedade Rural
             </h2>
             <p className="text-xs text-slate-500 mb-4">
-              Preencha os dados da fazenda e vincule opcionalmente ao produtor responsável.
+              Preencha os dados da fazenda e selecione um ou mais produtores rurais (co-proprietários) vinculados.
             </p>
 
             {errorMsg && (
@@ -671,12 +840,12 @@ export const Propriedades: React.FC = () => {
             )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* SEÇÃO PRODUTOR RESPONSÁVEL */}
+              {/* SEÇÃO PRODUTORES RESPONSÁVEIS (MÚLTIPLOS) */}
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-800 flex items-center">
-                    <Building2 className="w-4 h-4 text-agro-primary mr-1.5" />
-                    Produtor Responsável (Opcional)
+                    <Users className="w-4 h-4 text-agro-primary mr-1.5" />
+                    Produtores Rurais ({selectedProdutorIds.length} selecionado{selectedProdutorIds.length !== 1 ? 's' : ''})
                   </span>
 
                   <button
@@ -685,34 +854,114 @@ export const Propriedades: React.FC = () => {
                     className="text-xs text-agro-primary hover:underline font-bold flex items-center cursor-pointer"
                   >
                     <UserPlus className="w-3.5 h-3.5 mr-1" />
-                    {isNewProducerMode ? 'Selecionar da Lista / Sem Produtor' : '+ Novo Produtor'}
+                    {isNewProducerMode ? 'Voltar à Lista' : '+ Novo Produtor'}
                   </button>
                 </div>
 
                 {!isNewProducerMode ? (
-                  <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">
-                      Escolha o produtor na lista (opcional)
-                    </label>
-                    <select
-                      value={selectedProdutorId}
-                      onChange={(e) => setSelectedProdutorId(e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-agro-primary cursor-pointer"
-                    >
-                      <option value="">-- Sem produtor vinculado (Vincular depois) --</option>
-                      {produtores.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.nome} {p.cpfCnpj ? `(${p.cpfCnpj})` : ''}
-                        </option>
-                      ))}
-                    </select>
+                  <div className="space-y-2.5">
+                    {/* CHIPS DE PRODUTORES SELECIONADOS */}
+                    {selectedProdutorIds.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 p-2 bg-white border border-slate-200 rounded-xl max-h-24 overflow-y-auto">
+                        {selectedProdutorIds.map((pid) => {
+                          const prod = produtores.find((p) => p.id === pid);
+                          return (
+                            <span
+                              key={pid}
+                              className="inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-900 border border-emerald-200"
+                            >
+                              <Building2 className="w-3 h-3 text-agro-primary mr-1" />
+                              {prod?.nome || 'Produtor'}
+                              <button
+                                type="button"
+                                onClick={() => handleToggleProducerSelection(pid)}
+                                className="ml-1.5 text-emerald-600 hover:text-red-500 font-bold cursor-pointer"
+                              >
+                                ✕
+                              </button>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* BUSCA DE PRODUTORES */}
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        placeholder="Buscar produtor cadastrado..."
+                        value={producerSearchTerm}
+                        onChange={(e) => setProducerSearchTerm(e.target.value)}
+                        className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-agro-primary"
+                      />
+                    </div>
+
+                    {/* LISTA DE PRODUTORES COM CHECKBOXES */}
+                    <div className="max-h-44 overflow-y-auto border border-slate-200 rounded-xl divide-y divide-slate-100 bg-white">
+                      {produtores.length === 0 ? (
+                        <div className="p-3 text-center text-xs text-slate-400">
+                          Nenhum produtor cadastrado. Use "+ Novo Produtor" acima.
+                        </div>
+                      ) : (
+                        produtores
+                          .filter((p) => {
+                            const term = producerSearchTerm.toLowerCase();
+                            return (
+                              (p.nome || '').toLowerCase().includes(term) ||
+                              (p.cpfCnpj || '').toLowerCase().includes(term) ||
+                              (p.email || '').toLowerCase().includes(term)
+                            );
+                          })
+                          .map((p) => {
+                            const isChecked = selectedProdutorIds.includes(p.id || '');
+                            const isLinkedToUser = usuariosProdutores.some(
+                              (u) => u.id === p.id || u.produtorId === p.id || (u.email && p.email && u.email.toLowerCase() === p.email.toLowerCase())
+                            );
+                            return (
+                              <label
+                                key={p.id}
+                                className={`flex items-center justify-between px-3 py-2 text-xs cursor-pointer transition-colors ${
+                                  isChecked ? 'bg-emerald-50/70 font-semibold' : 'hover:bg-slate-50'
+                                }`}
+                              >
+                                <div className="flex items-center space-x-2.5 truncate mr-2">
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    onChange={() => p.id && handleToggleProducerSelection(p.id)}
+                                    className="w-4 h-4 text-agro-primary rounded border-slate-300 focus:ring-agro-primary cursor-pointer"
+                                  />
+                                  <div className="truncate">
+                                    <div className="text-slate-900 truncate flex items-center">
+                                      {p.nome}
+                                      {isLinkedToUser && (
+                                        <span className="ml-1.5 px-1.5 py-0.5 bg-blue-50 text-blue-700 text-[9px] font-bold rounded border border-blue-200 flex items-center">
+                                          <ShieldCheck className="w-2.5 h-2.5 mr-0.5" />
+                                          Usuário
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="text-[10px] text-slate-500 truncate">
+                                      {p.cpfCnpj || 'Produtor Rural'} {p.email ? `• ${p.email}` : ''}
+                                    </div>
+                                  </div>
+                                </div>
+                                {isChecked && (
+                                  <span className="text-[10px] text-emerald-700 bg-emerald-100 font-bold px-1.5 py-0.5 rounded shrink-0">
+                                    Selecionado
+                                  </span>
+                                )}
+                              </label>
+                            );
+                          })
+                      )}
+                    </div>
                   </div>
                 ) : (
                   <div className="space-y-2.5 pt-1">
                     <div className="text-[11px] text-agro-forest font-semibold bg-agro-secondary/60 px-2.5 py-1 rounded-lg">
-                      {produtores.length === 0
-                        ? 'Nenhum produtor cadastrado no banco. Informe os dados do produtor abaixo para vinculá-lo:'
-                        : 'Cadastrando novo produtor diretamente nesta fazenda:'}
+                      Cadastrando novo produtor rural diretamente para vincular a esta fazenda:
                     </div>
 
                     <div>
@@ -842,6 +1091,106 @@ export const Propriedades: React.FC = () => {
                 >
                   {submitting && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
                   Salvar Propriedade
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE EDIÇÃO DE DADOS DA FAZENDA */}
+      {editModalOpen && selectedPropForEdit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+              <h2 className="text-xl font-bold text-slate-900 flex items-center">
+                <Edit3 className="w-5 h-5 text-agro-primary mr-2" />
+                Editar Dados da Fazenda
+              </h2>
+              <button
+                type="button"
+                onClick={() => setEditModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 text-lg font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="text-xs text-slate-500 mb-4">
+              Atualize o nome, área, localização ou inscrição estadual da propriedade.
+            </p>
+
+            <form onSubmit={handleSaveEdit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Nome da Propriedade / Fazenda *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editNomeFazenda}
+                  onChange={(e) => setEditNomeFazenda(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-agro-primary"
+                  placeholder="Ex: Fazenda Santa Luzia"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Área Total (Hectares) *
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    step="0.1"
+                    value={editAreaHectares}
+                    onChange={(e) => setEditAreaHectares(Number(e.target.value))}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-agro-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Inscrição Estadual (Opcional)
+                  </label>
+                  <input
+                    type="text"
+                    value={editInscricaoEstadual}
+                    onChange={(e) => setEditInscricaoEstadual(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-agro-primary"
+                    placeholder="001.002.003-00"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Município - UF / Localização
+                </label>
+                <input
+                  type="text"
+                  value={editLocalizacao}
+                  onChange={(e) => setEditLocalizacao(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-agro-primary"
+                  placeholder="Ex: Uberlândia/MG - Estrada Vicinal Km 12"
+                />
+              </div>
+
+              <div className="pt-4 flex items-center justify-end space-x-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setEditModalOpen(false)}
+                  className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-5 py-2 text-sm font-semibold text-white bg-agro-primary hover:bg-agro-primary-hover rounded-xl flex items-center shadow-sm cursor-pointer disabled:opacity-60"
+                >
+                  {submitting && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                  Salvar Alterações
                 </button>
               </div>
             </form>
