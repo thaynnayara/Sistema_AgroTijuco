@@ -67,4 +67,24 @@ public class AnimalController {
         AnimalResponseDTO atualizado = service.atualizarStatus(id, status);
         return ResponseEntity.ok(atualizado);
     }
+
+    /**
+     * Atualizar dados completos do animal
+     */
+    @PutMapping("/{id}")
+    public ResponseEntity<AnimalResponseDTO> atualizar(
+            @PathVariable UUID id,
+            @RequestBody AnimalRequestDTO dto) {
+        AnimalResponseDTO atualizado = service.atualizar(id, dto);
+        return ResponseEntity.ok(atualizado);
+    }
+
+    /**
+     * Excluir animal
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> excluir(@PathVariable UUID id) {
+        service.excluir(id);
+        return ResponseEntity.noContent().build();
+    }
 }

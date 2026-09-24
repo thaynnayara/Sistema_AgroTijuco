@@ -18,5 +18,6 @@ public record AnimalResponseDTO(
         StatusAnimal status,
         boolean emCarenciaSanitaria,
         LocalDate dataFimCarencia,
+        UUID propriedadeId,
         String nomeFazenda
 ) {}

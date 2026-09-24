@@ -106,7 +106,7 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const atualizarFazenda = async (id: string, dados: Partial<Propriedade>): Promise<Propriedade> => {
     try {
-      if (dados.produtoresIds && dados.produtoresIds.length > 0) {
+      if (dados.produtoresIds !== undefined) {
         await propriedadeService.atribuirProdutores(id, dados.produtoresIds);
       }
       await propriedadeService.atualizarPropriedade(id, dados);

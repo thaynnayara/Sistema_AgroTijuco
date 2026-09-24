@@ -36,10 +36,12 @@ public class AnimalService {
     @Autowired
     private RegistroSanitarioRepository registroSanitarioRepository;
 
+    @Transactional(readOnly = true)
     public List<AnimalResponseDTO> listarTodos() {
-        return animalRepository.findAll().stream().map(this::mapParaResponseDTO).collect(Collectors.toList());
+        return animalRepository.findAllWithRelations().stream().map(this::mapParaResponseDTO).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public List<AnimalResponseDTO> listarPorPropriedade(UUID propriedadeId) {
         return animalRepository.findByPropriedadeId(propriedadeId).stream().map(this::mapParaResponseDTO).collect(Collectors.toList());
     }
@@ -93,6 +95,68 @@ public class AnimalService {
     }
 
     /**
+     * Atualização dos dados do animal
+     */
+     @Transactional
+     public AnimalResponseDTO atualizar(UUID id, AnimalRequestDTO dto) {
+         Animal animal = animalRepository.findByIdWithRelations(id)
+                 .orElseThrow(() -> new RuntimeException("Animal não encontrado com ID: " + id));
+
+         if (dto.brinco() == null || dto.brinco().trim().isEmpty()) {
+             throw new IllegalArgumentException("O número do brinco é obrigatório.");
+         }
+
+         UUID propId = null;
+         try {
+             if (animal.getPropriedade() != null) {
+                 propId = animal.getPropriedade().getId();
+             }
+         } catch (Exception ignored) {}
+
+         if (propId != null) {
+             boolean brincoJaExiste = animalRepository.existsByBrincoAndPropriedadeIdAndIdNot(dto.brinco().trim(), propId, id);
+             if (brincoJaExiste) {
+                 throw new IllegalArgumentException("O brinco " + dto.brinco() + " já está em uso por outro animal nesta propriedade.");
+             }
+         }
+
+         // RN02 - Bloqueio por Carência Sanitária se for alterado para VENDIDO ou ABATIDO
+         if (dto.status() != null && dto.status() != animal.getStatus() &&
+                 (dto.status() == StatusAnimal.VENDIDO || dto.status() == StatusAnimal.ABATIDO)) {
+             validarCarenciaSanitaria(animal);
+         }
+
+         animal.setBrinco(dto.brinco().trim());
+         animal.setRfid(dto.rfid());
+         animal.setLote(dto.lote());
+         animal.setNome(dto.nome());
+         if (dto.sexo() != null) animal.setSexo(dto.sexo());
+         if (dto.raca() != null) animal.setRaca(dto.raca());
+         if (dto.dataNascimento() != null) animal.setDataNascimento(dto.dataNascimento());
+         if (dto.status() != null) animal.setStatus(dto.status());
+
+         if (dto.piqueteId() != null) {
+             Piquete piquete = piqueteRepository.findById(dto.piqueteId()).orElse(null);
+             animal.setPiquete(piquete);
+         } else {
+             animal.setPiquete(null);
+         }
+
+         Animal salvo = animalRepository.save(animal);
+         return mapParaResponseDTO(salvo);
+     }
+
+    /**
+     * Exclusão de animal
+     */
+    @Transactional
+    public void excluir(UUID id) {
+        Animal animal = animalRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Animal não encontrado com ID: " + id));
+        animalRepository.delete(animal);
+    }
+
+    /**
      * Atualização de Status com verificação da Regra de Negócio RN02 (Bloqueio por Carência Sanitária)
      */
     @Transactional
@@ -102,15 +166,7 @@ public class AnimalService {
 
         // RN02 - Bloqueio por Carência Sanitária
         if (novoStatus == StatusAnimal.VENDIDO || novoStatus == StatusAnimal.ABATIDO) {
-            List<RegistroSanitario> registrosEmCarencia = registroSanitarioRepository.findEmCarencia(animal.getId(), LocalDate.now());
-            if (!registrosEmCarencia.isEmpty()) {
-                RegistroSanitario r = registrosEmCarencia.get(0);
-                throw new IllegalStateException(
-                        "BLOQUEIO POR CARÊNCIA SANITÁRIA (RN02): O animal brinco [" + animal.getBrinco() + 
-                        "] está sob efeito do medicamento/vacina '" + r.getMedicamentoVacina() + 
-                        "' com carência ativa até " + r.getDataFimCarencia() + ". Operação de Venda/Abate cancelada."
-                );
-            }
+            validarCarenciaSanitaria(animal);
         }
 
         animal.setStatus(novoStatus);
@@ -118,8 +174,21 @@ public class AnimalService {
         return mapParaResponseDTO(atualizado);
     }
 
+    private void validarCarenciaSanitaria(Animal animal) {
+        List<RegistroSanitario> registrosEmCarencia = registroSanitarioRepository.findEmCarencia(animal.getId(), LocalDate.now());
+        if (!registrosEmCarencia.isEmpty()) {
+            RegistroSanitario r = registrosEmCarencia.get(0);
+            throw new IllegalStateException(
+                    "BLOQUEIO POR CARÊNCIA SANITÁRIA (RN02): O animal brinco [" + animal.getBrinco() + 
+                    "] está sob efeito do medicamento/vacina '" + r.getMedicamentoVacina() + 
+                    "' com carência ativa até " + r.getDataFimCarencia() + ". Operação de Venda/Abate cancelada."
+            );
+        }
+    }
+
+    @Transactional(readOnly = true)
     public AnimalResponseDTO buscarPorId(UUID id) {
-        Animal animal = animalRepository.findById(id)
+        Animal animal = animalRepository.findByIdWithRelations(id)
                 .orElseThrow(() -> new RuntimeException("Animal não encontrado."));
         return mapParaResponseDTO(animal);
     }
@@ -129,13 +198,31 @@ public class AnimalService {
         boolean emCarencia = !carencias.isEmpty();
         LocalDate dataFim = emCarencia ? carencias.get(0).getDataFimCarencia() : null;
 
+        UUID propId = null;
+        String nomeFazenda = null;
+        try {
+            if (animal.getPropriedade() != null) {
+                propId = animal.getPropriedade().getId();
+                nomeFazenda = animal.getPropriedade().getNomeFazenda();
+            }
+        } catch (Exception ignored) {}
+
+        UUID piqueteId = null;
+        String nomePiquete = null;
+        try {
+            if (animal.getPiquete() != null) {
+                piqueteId = animal.getPiquete().getId();
+                nomePiquete = animal.getPiquete().getNomePiquete();
+            }
+        } catch (Exception ignored) {}
+
         return new AnimalResponseDTO(
                 animal.getId(),
                 animal.getBrinco(),
                 animal.getRfid(),
                 animal.getLote(),
-                animal.getPiquete() != null ? animal.getPiquete().getId() : null,
-                animal.getPiquete() != null ? animal.getPiquete().getNomePiquete() : null,
+                piqueteId,
+                nomePiquete,
                 animal.getNome(),
                 animal.getSexo(),
                 animal.getRaca(),
@@ -143,7 +230,8 @@ public class AnimalService {
                 animal.getStatus(),
                 emCarencia,
                 dataFim,
-                animal.getPropriedade() != null ? animal.getPropriedade().getNomeFazenda() : null
+                propId,
+                nomeFazenda
         );
     }
 }

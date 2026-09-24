@@ -53,6 +53,7 @@ export const Propriedades: React.FC = () => {
   const [editAreaHectares, setEditAreaHectares] = useState<number>(100);
   const [editLocalizacao, setEditLocalizacao] = useState('');
   const [editInscricaoEstadual, setEditInscricaoEstadual] = useState('');
+  const [editSelectedProdutorIds, setEditSelectedProdutorIds] = useState<string[]>([]);
   
   // Múltiplos produtores selecionados
   const [selectedProdutorIds, setSelectedProdutorIds] = useState<string[]>([]);
@@ -361,6 +362,10 @@ export const Propriedades: React.FC = () => {
     setEditAreaHectares(prop.areaHectares || 100);
     setEditLocalizacao(prop.localizacao || prop.municipio || '');
     setEditInscricaoEstadual(prop.inscricaoEstadual || '');
+    const existingProds = prop.produtoresIds && prop.produtoresIds.length > 0
+      ? prop.produtoresIds
+      : (prop.produtorId ? [prop.produtorId] : []);
+    setEditSelectedProdutorIds(existingProds);
     setErrorMsg(null);
     setEditModalOpen(true);
   };
@@ -379,6 +384,16 @@ export const Propriedades: React.FC = () => {
 
     setSubmitting(true);
     try {
+      const realIds: string[] = [];
+      for (const pid of editSelectedProdutorIds) {
+        const realId = await ensureRealProducerId(pid);
+        if (realId && !realIds.includes(realId)) {
+          realIds.push(realId);
+        }
+      }
+      const targetProds = produtores.filter((p) => p.id && realIds.includes(p.id));
+      const nomes = targetProds.map((p) => p.nome);
+
       const atualizada = await atualizarFazenda(selectedPropForEdit.id, {
         nome: editNomeFazenda.trim(),
         nomeFazenda: editNomeFazenda.trim(),
@@ -386,13 +401,17 @@ export const Propriedades: React.FC = () => {
         localizacao: editLocalizacao.trim() || 'Localização não informada',
         municipio: editLocalizacao.trim() || 'Localização não informada',
         inscricaoEstadual: editInscricaoEstadual.trim(),
+        produtoresIds: realIds,
+        produtorId: realIds[0] || undefined,
+        produtorNome: nomes.join(', ') || undefined,
+        produtorNomes: nomes,
       });
 
       setPropriedades((prev) =>
         prev.map((p) => (p.id === selectedPropForEdit.id ? { ...p, ...atualizada } : p))
       );
 
-      setSuccessMsg(`Dados da fazenda "${atualizada.nome}" atualizados com sucesso!`);
+      setSuccessMsg(`Dados e produtores da fazenda "${atualizada.nome}" atualizados com sucesso!`);
       setEditModalOpen(false);
       setSelectedPropForEdit(null);
       setTimeout(() => setSuccessMsg(null), 3000);
@@ -1174,6 +1193,48 @@ export const Propriedades: React.FC = () => {
                   className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-agro-primary"
                   placeholder="Ex: Uberlândia/MG - Estrada Vicinal Km 12"
                 />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-slate-700 flex items-center">
+                    <Users className="w-3.5 h-3.5 text-agro-primary mr-1" />
+                    Produtores Rurais Responsáveis ({editSelectedProdutorIds.length} selecionado{editSelectedProdutorIds.length !== 1 ? 's' : ''})
+                  </label>
+                  <span className="text-[10px] text-slate-400 font-normal">Uma fazenda pode ter múltiplos produtores</span>
+                </div>
+                <div className="max-h-36 overflow-y-auto border border-slate-200 rounded-xl divide-y divide-slate-100 bg-white">
+                  {produtores.length === 0 ? (
+                    <div className="p-3 text-center text-xs text-slate-400">Nenhum produtor cadastrado.</div>
+                  ) : (
+                    produtores.map((p) => {
+                      const isChecked = editSelectedProdutorIds.includes(p.id || '');
+                      return (
+                        <label
+                          key={p.id}
+                          className={`flex items-center space-x-2.5 px-3 py-2 text-xs cursor-pointer transition-colors ${
+                            isChecked ? 'bg-emerald-50 font-semibold' : 'hover:bg-slate-50'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => {
+                              if (!p.id) return;
+                              setEditSelectedProdutorIds((prev) =>
+                                prev.includes(p.id!) ? prev.filter((id) => id !== p.id) : [...prev, p.id!]
+                              );
+                            }}
+                            className="w-4 h-4 text-agro-primary rounded border-slate-300 focus:ring-agro-primary cursor-pointer"
+                          />
+                          <span className="truncate text-slate-800">
+                            {p.nome} {p.cpfCnpj ? `(${p.cpfCnpj})` : ''}
+                          </span>
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
               </div>
 
               <div className="pt-4 flex items-center justify-end space-x-3 border-t border-slate-100">

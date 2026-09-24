@@ -60,5 +60,14 @@ export const animalService = {
   async atualizarStatus(animalId: string, status: Animal['status']): Promise<Animal> {
     const response = await api.patch<Animal>(`/animais/${animalId}/status?status=${status}`);
     return response.data;
+  },
+
+  async atualizar(animalId: string, animal: Partial<Animal>): Promise<Animal> {
+    const response = await api.put<Animal>(`/animais/${animalId}`, animal);
+    return response.data;
+  },
+
+  async excluir(animalId: string): Promise<void> {
+    await api.delete(`/animais/${animalId}`);
   }
 };
